@@ -11,6 +11,18 @@ Controlador MIDI caseiro feito com um **Arduino Pro Micro**: 16 teclas e 4 encod
  <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" />
 </p>
 
+## Download
+
+**[⬇ Baixar o programa para Windows (.zip)](https://github.com/carlostoni/arduino-midi-encoder-controller/releases/latest)**
+
+Não precisa instalar nada, nem o Python:
+
+1. Extraia o `.zip`.
+2. Abra `Controlador MIDI.exe`.
+3. Na primeira vez, clique em **Calibrar agora**.
+
+Se o Windows SmartScreen avisar "Aplicativo não reconhecido", clique em **Mais informações → Executar assim mesmo**. O programa não é assinado.
+
 ## Projeto montado
 ![midi](https://github.com/carlostoni/ArduinoMIDIEncoderController/assets/80012970/8bffcd88-4fce-4e25-b3d2-687adfa83afe)
 

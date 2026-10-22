@@ -280,7 +280,7 @@ function resumo(a) {
   switch (a.tipo) {
     case "midia": return midia[a.valor] || "Mídia";
     case "atalho": return a.valor || "Atalho";
-    case "abrir": return "Abrir " + (a.valor || "").split(/[\\/]/).filter(Boolean).pop();
+    case "abrir": return "Abrir " + (a.valor || "").replace(/"/g, "").split(/[\\/]/).filter(Boolean).pop();
     case "texto": return "Digitar “" + (a.valor || "") + "”";
     case "comando": return "Comando";
     case "volume_sistema": return "Volume geral";

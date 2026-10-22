@@ -87,7 +87,9 @@ Programa para Windows que dá funções às teclas e aos encoders de um controla
 - O usuário prefere apps locais em Python com servidor HTTP + janela própria, explicações em português e nada de dependências pesadas.
 
 ## Cópia para o GitHub
-- Fica em `..\Controlador MIDI - GitHub\`: repositório git (branch `main`) com o código, o `README.md` e um `.gitignore` que deixa de fora `config.json`, `Perfis exportados\`, `erro.log`, `build\` e `dist\`.
+- Fica em `..\Controlador MIDI - GitHub\`: um clone de https://github.com/carlostoni/arduino-midi-encoder-controller, o repositório original do usuário (branch `main`).
+  - As versões antigas do firmware ficam em `encoder_matriz/`.
+  - O `.gitignore` deixa de fora `config.json`, `Perfis exportados\`, `erro.log`, `build\` e `dist\`.
 - Ela **não é atualizada sozinha**. Depois de mudar o projeto, copie os arquivos alterados para lá, faça o commit e o push.
 
 ## Versão nativa (.exe portátil)

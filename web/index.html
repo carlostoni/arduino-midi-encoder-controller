@@ -1,0 +1,1048 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controlador MIDI</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --painel: #ffffff; --borda: #dfe2e7; --texto: #1d2129; --suave: #687082;
+    --tecla: #eef0f3; --tecla-borda: #cfd4db; --acento: #3b6ef5; --acento-suave: #e3eafe;
+    --ok: #1f9d55; --erro: #d03b3b; --aceso: #ffb020;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171c; --painel: #1e2128; --borda: #2e323c; --texto: #e7e9ee; --suave: #959cab;
+      --tecla: #272b34; --tecla-borda: #3a3f4b; --acento: #6d93ff; --acento-suave: #26304a;
+      --ok: #3ccf7d; --erro: #ff6b6b; --aceso: #ffc14d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--texto);
+         font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+           padding: 12px 20px; background: var(--painel); border-bottom: 1px solid var(--borda); }
+  header h1 { font-size: 17px; margin: 0 8px 0 0; font-weight: 600; }
+  .status { display: flex; align-items: center; gap: 7px; color: var(--suave); }
+  .ponto { width: 9px; height: 9px; border-radius: 50%; background: var(--erro); flex: none; }
+  .ponto.on { background: var(--ok); }
+  .espaco { flex: 1; }
+  select, input[type=text], textarea {
+    font: inherit; color: var(--texto); background: var(--bg); border: 1px solid var(--borda);
+    border-radius: 7px; padding: 6px 9px; }
+  textarea { width: 100%; min-height: 80px; resize: vertical; }
+  input[type=text] { width: 100%; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--borda); background: var(--painel);
+           color: var(--texto); border-radius: 7px; padding: 6px 12px; }
+  button:hover { border-color: var(--acento); }
+  button.primario { background: var(--acento); border-color: var(--acento); color: #fff; }
+  button.gravando { background: var(--erro); border-color: var(--erro); color: #fff; }
+  label.chk { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 18px 20px; }
+  /* painel de função: fica escondido à direita e desliza para dentro ao escolher um controle */
+  .editor { position: fixed; top: 0; right: 0; bottom: 0; width: 400px; max-width: 100%; z-index: 10;
+            overflow-y: auto; border-radius: 12px 0 0 12px; border-right: none;
+            box-shadow: -8px 0 28px rgba(0, 0, 0, .18); transform: translateX(105%);
+            transition: transform .25s ease; }
+  .editor.aberto { transform: none; }
+  .editor .fechar { position: absolute; top: 10px; right: 10px; border: none; background: none;
+                    font-size: 20px; line-height: 1; padding: 4px 8px; color: var(--suave); }
+  .editor .fechar:hover { color: var(--texto); }
+  .painel { background: var(--painel); border: 1px solid var(--borda); border-radius: 12px; padding: 16px; }
+  .painel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--suave);
+               margin: 0 0 12px; font-weight: 600; }
+
+  /* mesma disposição do aparelho: knobs em zigue-zague (os de índice 2 e 3 ficam mais baixos) */
+  .encoders { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; padding-bottom: 30px; }
+  .encoders .baixo { transform: translateY(30px); }
+  .ctrl.alvo { border-color: var(--aceso); box-shadow: 0 0 0 3px var(--aceso); animation: pulsa 1s infinite; }
+  @keyframes pulsa { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--aceso) 35%, transparent); } }
+  .tecla { border-top-width: 5px; }
+  .tecla.cor0 { border-top-color: #e5484d; } .tecla.cor1 { border-top-color: #2f7cf6; }
+  .tecla.cor2 { border-top-color: #2ea44f; } .tecla.cor3 { border-top-color: #f1c21b; }
+  .aviso button { margin-left: 8px; padding: 3px 10px; }
+
+  .perfis { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 20px;
+            background: var(--painel); border-bottom: 1px solid var(--borda); }
+  .perfis b { font-weight: 600; margin-right: 2px; }
+  .perfis select { min-width: 180px; font-weight: 600; }
+  .perfis button { padding: 4px 10px; font-size: 13px; }
+  .perfis .sep { width: 1px; height: 22px; background: var(--borda); margin: 0 6px; }
+  /* barra de perfis recolhível: ▲ sobe, a abinha ▼ abre de novo */
+  .perfis-wrap { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .25s ease; }
+  .perfis-wrap > .perfis { overflow: hidden; min-height: 0; }
+  .perfis .seta { margin-left: auto; border: none; background: none; color: var(--suave); font-size: 15px; }
+  .perfis .seta:hover { color: var(--texto); }
+  .aba-perfis { display: none; margin: 0 auto; border-top: none; border-radius: 0 0 10px 10px;
+                padding: 3px 14px 4px; font-size: 12.5px; color: var(--suave); }
+  .aba-perfis b { color: var(--texto); font-weight: 600; }
+  body.perfis-recolhido .perfis-wrap { grid-template-rows: 0fr; }
+  body.perfis-recolhido .perfis-wrap > .perfis { padding-top: 0; padding-bottom: 0; border-bottom-width: 0; }
+  body.perfis-recolhido .aba-perfis { display: block; }
+  dialog { border: 1px solid var(--borda); border-radius: 12px; background: var(--painel); color: var(--texto);
+           padding: 18px; width: min(380px, 90vw); box-shadow: 0 12px 40px rgba(0, 0, 0, .25); }
+  dialog::backdrop { background: rgba(0, 0, 0, .35); }
+  dialog p { margin: 0 0 12px; }
+  dialog .botoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  #toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px); opacity: 0;
+           background: var(--texto); color: var(--bg); padding: 9px 16px; border-radius: 9px; font-size: 13.5px;
+           transition: opacity .2s, transform .2s; pointer-events: none; z-index: 20; max-width: 90vw; }
+  #toast.mostra { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---- janela estreita: tudo encolhe junto com a janela ---- */
+  @media (max-width: 720px) {
+    header { padding: 8px 12px; gap: 8px; }
+    header h1 { font-size: 15px; }
+    #dispositivo { max-width: 150px; }
+    .perfis { padding: 7px 12px; }
+    main { padding: 12px; }
+    .painel { padding: 12px; }
+    .encoders { gap: 8px; }
+    .teclas { gap: 7px; }
+    .ctrl { padding: 7px 4px; border-radius: 8px; }
+    .ctrl .tipo { font-size: 10.5px; }
+    .editor { width: 100%; border-radius: 0; }
+    .aviso { margin-left: 12px; margin-right: 12px; }
+  }
+  @media (max-width: 520px) {
+    header .status #status-txt, .chk[title^="Ao apertar"], .chk[title^="Ao girar"] { display: none; }   /* sobra só a bolinha */
+    .perfis .sep, #pf-exportar-todos { display: none; }
+    .encoders { padding-bottom: 20px; }
+    .encoders .baixo { transform: translateY(20px); }
+    .ctrl .nome { font-size: 12.5px; }
+    .ctrl .tipo { display: none; }
+    .tecla { aspect-ratio: 1.15; }
+  }
+  .teclas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .ctrl { position: relative; border: 1px solid var(--tecla-borda); background: var(--tecla);
+          border-radius: 10px; cursor: pointer; text-align: center; transition: background .08s, border-color .08s;
+          padding: 10px 6px; min-width: 0; }
+  .ctrl:hover { border-color: var(--acento); }
+  .ctrl.sel { border-color: var(--acento); box-shadow: 0 0 0 2px var(--acento); }
+  .ctrl.aceso { background: var(--aceso); border-color: var(--aceso); color: #1d2129; }
+  .ctrl .num { position: absolute; top: 5px; left: 8px; font-size: 11px; color: var(--suave); }
+  .ctrl.aceso .num { color: #1d2129; }
+  .tecla { aspect-ratio: 1.35; display: flex; flex-direction: column; justify-content: center; }
+  .ctrl .nome { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px; }
+  .ctrl .tipo { font-size: 11.5px; color: var(--suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ctrl.aceso .tipo { color: #1d2129; }
+  .ctrl.vazio .nome { color: var(--suave); font-weight: 400; }
+  .knob { width: clamp(40px, 9vw, 64px); height: auto; margin: 2px auto 6px; display: block; }   /* encolhe com a janela */
+  .knob .trilho { stroke: var(--tecla-borda); }
+  .knob .arco { stroke: var(--acento); transition: stroke-dashoffset .08s; }
+  .knob text { fill: var(--texto); font-size: 15px; font-weight: 600; }
+  /* no mudo: risco vermelho atravessando o knob e o arco apagado */
+  .knob .risco { display: none; stroke: #e5484d; }
+  .ctrl.mudo .knob .risco { display: inline; }
+  .ctrl.mudo .knob .arco, .ctrl.mudo .knob text { opacity: .35; }
+
+  /* tecla/encoder com cor escolhida pelo usuário (--cor e --cor-texto vêm no style) */
+  .ctrl.colorida { background: var(--cor); border-color: var(--cor); color: var(--cor-texto); }
+  .ctrl.colorida .num, .ctrl.colorida .tipo, .ctrl.colorida.vazio .nome { color: var(--cor-texto); opacity: .8; }
+  .ctrl.colorida .knob .arco { stroke: var(--cor-texto); }
+  .ctrl.colorida .knob .trilho { stroke: color-mix(in srgb, var(--cor-texto) 28%, transparent); }
+  .ctrl.colorida .knob text { fill: var(--cor-texto); }
+  .ctrl.colorida.aceso { filter: brightness(1.3) saturate(1.2); box-shadow: 0 0 0 3px var(--aceso); }
+  .ctrl.colorida.sel { box-shadow: 0 0 0 2px var(--painel), 0 0 0 4px var(--acento); }
+  .ctrl .icone { font-size: 22px; line-height: 1.1; margin-bottom: 2px; }
+  .ctrl .knob + .icone { position: absolute; top: 4px; right: 7px; font-size: 16px; }
+
+  .cores { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .amostra { width: 26px; height: 26px; border-radius: 50%; padding: 0; border: 2px solid var(--borda);
+             cursor: pointer; position: relative; }
+  .amostra.marcada { box-shadow: 0 0 0 2px var(--painel), 0 0 0 4px var(--acento); }
+  .amostra.sem { background: linear-gradient(135deg, var(--tecla) 45%, var(--erro) 45% 55%, var(--tecla) 55%); }
+  .cores input[type=color] { width: 30px; height: 28px; padding: 0 2px; border: 1px solid var(--borda);
+                             border-radius: 7px; background: var(--bg); cursor: pointer; }
+  .ctrl .icone img { width: 1.2em; height: 1.2em; display: inline-block; vertical-align: middle; }
+  .chip-icone { display: inline-flex; align-items: center; cursor: pointer; padding-right: 4px; }
+  .chip-icone img { width: 16px; height: 16px; margin-right: 5px; }
+  .tirar-sug { border: none; background: none; padding: 0 3px 0 6px; font-size: 14px; line-height: 1;
+               color: var(--suave); cursor: pointer; }
+  .tirar-sug:hover { color: #e5484d; }
+  .chip-icone.marcada { box-shadow: 0 0 0 2px var(--acento); }
+  .emojis { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
+  .emojis button { border: none; background: none; font-size: 18px; padding: 2px 4px; border-radius: 6px; }
+  .emojis button:hover { background: var(--acento-suave); }
+  #icone { width: 70px; text-align: center; font-size: 18px; flex: none; }
+
+  .editor .vazio { color: var(--suave); padding: 30px 0; text-align: center; }
+  .campo { margin-bottom: 14px; }
+  .campo > span { display: block; font-size: 12.5px; color: var(--suave); margin-bottom: 4px; }
+  .linha { display: flex; gap: 8px; }
+  .linha > input { flex: 1; }
+  .linha > button { white-space: nowrap; }
+  .dica { font-size: 12.5px; color: var(--suave); margin-top: 5px; }
+  .sub { border: 1px solid var(--borda); border-radius: 9px; padding: 10px 12px 2px; margin-bottom: 12px; }
+  .sub h3 { font-size: 13px; margin: 0 0 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+  .chip { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: var(--acento-suave);
+          border: none; color: var(--texto); }
+  .acoes-editor { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+  #salvo { font-size: 12.5px; color: var(--ok); opacity: 0; transition: opacity .3s; }
+  #salvo.mostra { opacity: 1; }
+  .aviso { margin: 0 20px; padding: 8px 12px; border-radius: 8px; background: var(--acento-suave);
+           font-size: 13px; display: none; }
+  .aviso.mostra { display: block; }
+  .aviso.erro { background: color-mix(in srgb, var(--erro) 15%, transparent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎛️ Controlador MIDI</h1>
+  <div class="status"><span class="ponto" id="ponto"></span><span id="status-txt">Procurando…</span></div>
+  <select id="dispositivo" title="Qual entrada MIDI usar"></select>
+  <div class="espaco"></div>
+  <button id="bt-calibrar" title="Ensina ao programa onde fica cada encoder e o botão de cada um">🎯 Calibrar</button>
+  <label class="chk" title="Ao apertar uma tecla no controlador, ela fica selecionada para editar">
+    <input type="checkbox" id="seguir"> Selecionar ao apertar</label>
+  <label class="chk" title="Ao girar ou apertar um encoder de volume com esta janela fora de foco, mostra uma barra no canto da tela">
+    <input type="checkbox" id="barra-volume"> Barra de volume na tela</label>
+  <label class="chk" title="Desligue para mexer na configuração sem disparar as funções">
+    <input type="checkbox" id="ativo"> Funções ligadas</label>
+</header>
+<div class="perfis-wrap"><div class="perfis">
+  <b>Perfil:</b>
+  <select id="perfil" title="Trocar de perfil"></select>
+  <button id="pf-novo" title="Perfil vazio">＋ Novo</button>
+  <button id="pf-duplicar" title="Cópia do perfil atual">Duplicar</button>
+  <button id="pf-renomear">Renomear</button>
+  <button id="pf-excluir">Excluir</button>
+  <span class="sep"></span>
+  <button id="pf-exportar" title="Salva o perfil atual num arquivo .json">⬇ Exportar</button>
+  <button id="pf-exportar-todos" title="Todos os perfis num arquivo só">⬇ Exportar todos</button>
+  <button id="pf-importar" title="Carregar perfis de um arquivo .json">⬆ Importar</button>
+  <input type="file" id="pf-arquivo" accept=".json,application/json" hidden>
+  <button class="seta" id="pf-recolher" title="Recolher a barra de perfis">▲</button>
+</div></div>
+<div style="display:flex"><button class="aba-perfis" id="pf-abrir" title="Abrir a barra de perfis">▼ Perfil: <b id="pf-nome"></b></button></div>
+<dialog id="dlg"><form method="dialog">
+  <p id="dlg-txt"></p>
+  <input type="text" id="dlg-input" autocomplete="off">
+  <div class="botoes"><button value="cancelar">Cancelar</button><button value="ok" class="primario" id="dlg-ok">OK</button></div>
+</form></dialog>
+<div id="toast"></div>
+<div class="aviso" id="aviso-calib" style="margin-top:12px"></div>
+<div class="aviso" id="aviso-midi" style="margin-top:12px"></div>
+<div class="aviso erro" id="aviso-erro" style="margin-top:12px"></div>
+
+<main>
+  <section class="painel">
+    <h2>Encoders</h2>
+    <div class="encoders" id="encoders"></div>
+    <h2>Teclas</h2>
+    <div class="teclas" id="teclas"></div>
+  </section>
+</main>
+<section class="painel editor" id="editor"></section>
+
+<script>
+const ENCODERS = [21, 22, 23, 24];                   // CC de cada encoder (firmware)
+const TECLAS = Array.from({length: 20}, (_, i) => i + 1);   // notas 1..20 (matriz 5x4 = 16 teclas + 4 botões de encoder)
+// Posições dos knobs no aparelho: 0 = cima-esq., 1 = cima-dir., 2 = baixo-meio, 3 = baixo-dir.
+// Na tela ficam na ordem 0, 2, 1, 3 (zigue-zague).
+const ORDEM_VISUAL = [0, 2, 1, 3];
+
+const TIPOS_TECLA = {
+  nenhum: "Nada", midia: "Mídia / volume", atalho: "Atalho de teclado",
+  abrir: "Abrir programa, arquivo ou site", texto: "Digitar texto", comando: "Rodar comando",
+  perfil: "Trocar de perfil", saida_som: "Trocar saída de som (fone, monitor...)",
+};
+const TIPOS_ENCODER = {
+  nenhum: "Nada", volume_sistema: "Volume geral do Windows",
+  volume_app: "Volume de um programa", volume_microfone: "Volume do microfone", direcao: "Uma função para cada lado",
+};
+
+const TIPOS_BOTAO_ENCODER = {nenhum: "Nada", mudo_encoder: "Mudo do que o encoder controla",
+  ...Object.fromEntries(Object.entries(TIPOS_TECLA).filter(([k]) => k !== "nenhum"))};
+
+let cfg = {controles: {}}, midia = {}, selecionado = null, seq = 0;
+let detectando = null;     // encoder esperando o usuário apertar o botão dele
+let calib = null;          // assistente de calibração: {passo, fase, novo, ativoAntes}
+let valores = {};
+let mudos = {};            // {"cc:N": true} encoders no mudo (o servidor lê do Windows)
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function api(caminho, dados) {
+  const r = await fetch(caminho, dados === undefined ? {} :
+    {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(dados)});
+  const j = await r.json();
+  if (j.erro) throw new Error(j.erro);
+  return j;
+}
+
+// ---------------- desenho do controlador ----------------
+function resumo(a) {
+  if (!a || !a.tipo || a.tipo === "nenhum") return "";
+  switch (a.tipo) {
+    case "midia": return midia[a.valor] || "Mídia";
+    case "atalho": return a.valor || "Atalho";
+    case "abrir": return "Abrir " + (a.valor || "").split(/[\\/]/).filter(Boolean).pop();
+    case "texto": return "Digitar “" + (a.valor || "") + "”";
+    case "comando": return "Comando";
+    case "volume_sistema": return "Volume geral";
+    case "volume_app": return "Vol. " + (a.valor || "programa");
+    case "volume_microfone": return "Mic " + (a.valor ? nomeCurtoSaida(a.microfone) : "padrão");
+    case "direcao": return [resumo(a.esquerda) || "—", resumo(a.direita) || "—"].join(" ⟷ ");
+    case "mudo_encoder": return "Mudo";
+    case "perfil": return a.valor ? "Perfil " + a.valor : "Próximo perfil";
+    case "saida_som": return a.valor || a.saida ? "Som: " + nomeCurtoSaida(a.saida) : "Próxima saída de som";
+  }
+  return "";
+}
+
+// "LG ULTRAWIDE (NVIDIA High Definition Audio)" -> "LG ULTRAWIDE" (só tira o nome do chip de áudio)
+// "Microfone (Samson C03U)" -> "Samson C03U"
+const nomeCurtoSaida = n => String(n || "").replace(/\s*\((NVIDIA|AMD|Intel|Realtek|High Definition)[^)]*\)\s*$/i, "")
+  .replace(/^(Microfone|Microphone)\s*\((.+)\)$/i, "$2") || n || "";
+
+// nota -> encoder ("cc:21") quando a nota é o botão de apertar daquele encoder.
+// cfg.botoes é do aparelho (vale para todos os perfis): {"cc:21": 17, ...}
+function donosDosBotoes() {
+  const m = {};
+  for (const [k, n] of Object.entries(cfg.botoes || {})) if (n != null) m["note:" + n] = k;
+  return m;
+}
+
+function knobSVG(valor) {
+  const r = 26, c = 2 * Math.PI * r, frac = valor == null ? 0 : valor / 127, arco = c * 0.75;
+  return `<svg class="knob" viewBox="0 0 64 64">
+    <circle class="trilho" cx="32" cy="32" r="${r}" fill="none" stroke-width="6" stroke-linecap="round"
+      stroke-dasharray="${arco} ${c}" transform="rotate(135 32 32)"/>
+    <circle class="arco" cx="32" cy="32" r="${r}" fill="none" stroke-width="6" stroke-linecap="round"
+      stroke-dasharray="${arco} ${c}" stroke-dashoffset="${arco * (1 - frac)}" transform="rotate(135 32 32)"/>
+    <text x="32" y="37" text-anchor="middle">${valor == null ? "–" : Math.round(valor * 100 / 127)}</text>
+    <line class="risco" x1="10" y1="54" x2="54" y2="10" stroke-width="5" stroke-linecap="round"/></svg>`;   // 127 aparece como 100
+}
+
+// ---------------- aparência (cor e ícone de cada controle) ----------------
+const CORES = ["#e5484d", "#f76b15", "#f1c21b", "#2ea44f", "#12a594", "#0ea5e9", "#2f7cf6",
+               "#8e4ec6", "#e93d82", "#8d6e63", "#6b7280", "#1f2328", "#f5f5f5"];
+const EMOJIS = ["🎵", "⏯️", "⏭️", "⏮️", "🔇", "🔊", "🎤", "🎧", "🎮", "📷", "💬", "🌐", "📁", "📋",
+                "✂️", "💾", "🔒", "💡", "⭐", "❤️", "🔥", "🚀", "⚙️", "🏠"];
+
+function corDoTexto(hex) {   // preto ou branco, o que tiver mais contraste com a cor
+  const n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6 ? "#1d2129" : "#ffffff";
+}
+function pintura(a) {         // classe + style para o quadradinho do controle
+  if (!a.cor || !/^#[0-9a-f]{6}$/i.test(a.cor)) return {cls: "", style: ""};
+  return {cls: "colorida", style: `style="--cor:${a.cor};--cor-texto:${corDoTexto(a.cor)}"`};
+}
+// ícone de programa (icone_app: "chrome.exe" ou caminho) tem prioridade sobre o emoji
+const urlIcone = app => "/api/icone?app=" + encodeURIComponent(app);
+const iconeHTML = a => a.icone_app ? `<div class="icone"><img src="${urlIcone(a.icone_app)}" alt=""></div>`
+                     : a.icone ? `<div class="icone">${esc(a.icone)}</div>` : "";
+
+function editorAparencia(a, mudou) {
+  const caixa = $("#aparencia");
+  const desenha = () => {
+    caixa.innerHTML = `
+      <div class="campo"><span>Cor</span><div class="cores">
+        <button class="amostra sem ${a.cor ? "" : "marcada"}" data-cor="" title="Sem cor (padrão)"></button>
+        ${CORES.map(c => `<button class="amostra ${a.cor === c ? "marcada" : ""}" data-cor="${c}" style="background:${c}" title="${c}"></button>`).join("")}
+        <input type="color" title="Outra cor" value="${a.cor || "#3b6ef5"}">
+      </div></div>
+      <div class="campo"><span>Ícone (opcional)</span>
+        <div class="linha"><input type="text" id="icone" maxlength="8" placeholder="—" value="${esc(a.icone_app ? "" : a.icone || "")}">
+          <button id="icone-limpar" title="Tirar o ícone">Tirar</button></div>
+        <div class="emojis">${EMOJIS.map(e => `<button title="Usar ${e}">${e}</button>`).join("")}</div>
+        <div class="dica">Pode digitar qualquer emoji (Win + . abre o painel de emojis).</div></div>
+      <div class="campo"><span>Ou o ícone de um programa</span>
+        <div class="chips" id="apps-icone"></div>
+        <div class="linha" style="margin-top:7px"><input type="text" id="icone-app" placeholder="Nome (ex.: chrome) ou caminho do .exe" value="${esc(a.icone_app || "")}">
+          <button id="icone-app-usar">Usar</button></div>
+        <div class="dica" id="icone-app-dica">Programas abertos são achados pelo nome; os outros, pelo caminho do .exe.</div></div>`;
+    caixa.querySelectorAll(".amostra").forEach(b => b.onclick = () => { if (b.dataset.cor) a.cor = b.dataset.cor; else delete a.cor; mudou(); desenha(); });
+    const cor = caixa.querySelector("input[type=color]");
+    cor.oninput = () => { a.cor = cor.value; mudou(); };
+    cor.onchange = desenha;
+    const ic = caixa.querySelector("#icone");
+    ic.oninput = () => { delete a.icone_app; if (ic.value.trim()) a.icone = ic.value.trim(); else delete a.icone; mudou(); };
+    caixa.querySelector("#icone-limpar").onclick = () => { delete a.icone; delete a.icone_app; mudou(); desenha(); };
+    caixa.querySelectorAll(".emojis button").forEach(b => b.onclick = () => { delete a.icone_app; a.icone = b.textContent; mudou(); desenha(); });
+    ligarIconeApp(a, caixa, mudou, desenha);
+  };
+  desenha();
+}
+
+// Sugestões: o programa que o controle já usa (volume de programa / abrir) + os que estão tocando som
+async function ligarIconeApp(a, caixa, mudou, desenha) {
+  const dica = caixa.querySelector("#icone-app-dica"), inp = caixa.querySelector("#icone-app");
+  const usar = app => {
+    app = app.replace(/"/g, "").trim();     // "Copiar como caminho" do Explorer vem com aspas
+    if (!app) return;
+    const teste = new Image();
+    teste.onload = () => { a.icone_app = app; delete a.icone; mudou(); desenha(); };
+    teste.onerror = () => { dica.textContent = `Não achei o ícone de “${app}”. Tente o caminho completo do .exe.`; };
+    teste.src = urlIcone(app);
+  };
+  caixa.querySelector("#icone-app-usar").onclick = () => usar(inp.value);
+  inp.onkeydown = e => { if (e.key === "Enter") usar(inp.value); };
+  // o ícone em uso vem primeiro; depois o do próprio controle e os que estão tocando som
+  const sugestoes = [a.icone_app];
+  if (a.tipo === "volume_app") sugestoes.push(...String(a.valor || "").split(",").map(s => s.trim()));
+  if (a.tipo === "abrir" && a.valor && !/^\w+:\/\//.test(a.valor)) sugestoes.push(a.valor.trim().replace(/^"|"$/g, ""));
+  try { sugestoes.push(...((await api("/api/apps-audio")).apps || [])); } catch {}
+  const emUso = a.icone_app ? chaveApp(a.icone_app) : null;
+  const ocultas = cfg.sugestoes_ocultas || [];
+  const porChave = new Map();               // "chrome" e "chrome.exe" são o mesmo programa
+  for (const s of sugestoes.filter(Boolean)) {
+    const k = chaveApp(s);
+    if (!porChave.has(k) && (k === emUso || !ocultas.includes(k))) porChave.set(k, s);
+  }
+  const chips = caixa.querySelector("#apps-icone");
+  if (!chips) return;                       // o painel foi redesenhado enquanto esperava
+  chips.innerHTML = [...porChave].map(([k, s]) => `<span class="chip chip-icone ${k === emUso ? "marcada" : ""}" role="button"
+      data-app="${esc(s)}" data-k="${esc(k)}" title="${esc(s)}"><img src="${urlIcone(s)}" alt="" onerror="this.parentElement.remove()">${
+      esc(k)}<button class="tirar-sug" title="${k === emUso ? "Tirar este ícone e" : ""} tirar da lista">×</button></span>`).join("")
+    + (ocultas.length ? `<button class="chip" id="mostrar-ocultas" title="Volta a sugerir os programas que você tirou">↺ Mostrar escondidos (${ocultas.length})</button>` : "");
+  chips.querySelectorAll(".chip-icone").forEach(c => c.onclick = () => usar(c.dataset.app));
+  chips.querySelectorAll(".tirar-sug").forEach(b => b.onclick = ev => {
+    ev.stopPropagation();
+    const k = b.parentElement.dataset.k;
+    cfg.sugestoes_ocultas = [...new Set([...ocultas, k])];
+    api("/api/config", {sugestoes_ocultas: cfg.sugestoes_ocultas});
+    if (k === emUso) { delete a.icone_app; mudou(); }
+    desenha();
+  });
+  const mostrar = chips.querySelector("#mostrar-ocultas");
+  if (mostrar) mostrar.onclick = () => {
+    cfg.sugestoes_ocultas = [];
+    api("/api/config", {sugestoes_ocultas: []});
+    desenha();
+  };
+}
+const chaveApp = s => String(s).replace(/"/g, "").trim().split(/[\\/]/).pop().toLowerCase().replace(/\.(exe|lnk)$/, "");
+
+const layout = () => (cfg.layout && cfg.layout.length === 4 ? cfg.layout : ENCODERS);
+const numEncoder = cc => layout().indexOf(cc) + 1;             // nº físico (E1..E4) do CC
+const teclasLivres = () => { const d = donosDosBotoes(); return TECLAS.filter(n => !d["note:" + n]); };
+
+function desenhar() {
+  $("#encoders").innerHTML = ORDEM_VISUAL.map(pos => {
+    const cc = layout()[pos], k = "cc:" + cc, a = cfg.controles[k] || {};
+    const b = a.botao && (cfg.botoes || {})[k] != null && resumo(a.botao) ? " · aperta: " + resumo(a.botao) : "";
+    const alvo = calib && calib.passo === pos ? "alvo" : "";
+    const p = pintura(a);
+    return `<div class="ctrl ${p.cls} ${pos >= 2 ? "baixo" : ""} ${mudos[k] ? "mudo" : ""} ${alvo} ${selecionado === k ? "sel" : ""} ${a.tipo && a.tipo !== "nenhum" ? "" : "vazio"}" data-k="${k}" ${p.style}>
+      <span class="num">E${pos + 1}</span>${knobSVG(valores[k])}${iconeHTML(a)}
+      <div class="nome">${esc(a.nome || "Encoder " + (pos + 1))}</div>
+      <div class="tipo" title="${esc((resumo(a) || "sem função") + b)}">${esc((resumo(a) || "sem função") + b)}</div></div>`;
+  }).join("");
+  // As 16 teclas físicas (4x4, uma cor por fileira). Se sobrar nota (botões dos encoders
+  // ainda não identificados), ela aparece numa fileira extra cinza.
+  $("#teclas").innerHTML = teclasLivres().map((n, i) => {
+    const k = "note:" + n, a = cfg.controles[k] || {}, p = pintura(a);
+    return `<div class="ctrl tecla ${p.cls} cor${Math.floor(i / 4)} ${selecionado === k ? "sel" : ""} ${a.tipo && a.tipo !== "nenhum" ? "" : "vazio"}" data-k="${k}" ${p.style}>
+      <span class="num">${i + 1}</span>${iconeHTML(a)}
+      <div class="nome">${esc(a.nome || (a.tipo && a.tipo !== "nenhum" ? resumo(a) : "Tecla " + (i + 1)))}</div>
+      <div class="tipo">${esc(a.nome ? resumo(a) : (a.tipo && a.tipo !== "nenhum" ? "" : "sem função"))}</div></div>`;
+  }).join("");
+  document.querySelectorAll(".ctrl").forEach(el => el.onclick = () => selecionar(el.dataset.k));
+}
+
+function acender(k, ligar) {
+  const el = document.querySelector(`.ctrl[data-k="${k}"]`);
+  if (!el) return;
+  el.classList.toggle("aceso", ligar);
+}
+
+// ---------------- editor ----------------
+function selecionar(k) {
+  if (k === selecionado) { fecharEditor(); return; }   // clicar de novo no mesmo controle recolhe
+  selecionado = k;
+  desenhar();
+  editor();
+  $("#editor").classList.add("aberto");
+}
+
+function fecharEditor() {
+  selecionado = null;
+  detectando = null;
+  $("#editor").classList.remove("aberto");
+  desenhar();
+}
+
+function editor() {
+  const k = selecionado, ehEnc = k.startsWith("cc:");
+  const num = +k.split(":")[1];
+  const titulo = ehEnc ? `Encoder ${numEncoder(num)} <small style="color:var(--suave)">· CC ${num}</small>`
+                       : `Tecla ${teclasLivres().indexOf(num) + 1} <small style="color:var(--suave)">· nota ${num}</small>`;
+  const a = cfg.controles[k] || (cfg.controles[k] = {tipo: "nenhum"});
+  const ed = $("#editor");
+  ed.innerHTML = `<button class="fechar" title="Fechar (Esc)">✕</button><h2>Função</h2><h3 style="margin:0 0 14px;font-size:17px">${titulo}</h3>
+    <div class="campo"><span>Nome (aparece na tecla)</span>
+      <input type="text" id="nome" placeholder="${ehEnc ? "Ex.: Spotify" : "Ex.: Copiar"}" value="${esc(a.nome || "")}"></div>
+    <div id="corpo"></div>
+    <details class="sub" id="aparencia-box" ${a.cor || a.icone || a.icone_app ? "open" : ""}><summary style="cursor:pointer;font-weight:600;font-size:13px;margin-bottom:8px">🎨 Aparência na tela</summary>
+      <div id="aparencia"></div></details>
+    <label class="chk" style="margin:4px 0 14px" title="Vale para todos os perfis: é um ajuste do aparelho">
+      <input type="checkbox" id="inverter"> ${ehEnc ? "Girar ao contrário (inverter o sentido)" : "Teclas na ordem inversa (1 ↔ 16, vale para todas)"}</label>
+    ${ehEnc ? `<div class="sub" id="botao-enc"><h3>⏺ Ao apertar o encoder</h3><div class="ligacao"></div><div class="acao-botao"></div></div>` : ""}
+    <div class="acoes-editor" id="testes"></div>
+    <div class="acoes-editor" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--borda)">
+      <button id="limpar" title="Apaga a função, o nome, a cor e o ícone deste controle">🗑 Limpar tudo</button></div>`;
+  ed.querySelector(".fechar").onclick = fecharEditor;
+  ligarLimpar(k, ehEnc);
+  const mudou = () => { salvarDepois(); desenharMantendo(); botoesTeste(); };
+  $("#nome").oninput = e => { a.nome = e.target.value; salvarDepois(); desenharMantendo(); };
+  campoAcao($("#corpo"), a, ehEnc ? TIPOS_ENCODER : TIPOS_TECLA, mudou);
+  editorAparencia(a, () => { salvarDepois(); desenharMantendo(); });
+  if (ehEnc) editorBotao(a, mudou);
+  ligarInverter(ehEnc, num);
+  botoesTeste();
+}
+
+// Limpar pede um segundo clique (3 s) para não apagar sem querer
+function ligarLimpar(k, ehEnc) {
+  const bt = $("#limpar");
+  let armado = null;
+  bt.onclick = () => {
+    if (!armado) {
+      bt.textContent = "Clique de novo para apagar"; bt.style.borderColor = bt.style.color = "#e5484d";
+      armado = setTimeout(() => { armado = null; bt.textContent = "🗑 Limpar tudo"; bt.style.borderColor = bt.style.color = ""; }, 3000);
+      return;
+    }
+    clearTimeout(armado);
+    // volta ao estado de fábrica; no encoder, o botão continua sendo o mudo do que ele controlar
+    cfg.controles[k] = ehEnc ? {tipo: "nenhum", botao: {tipo: "mudo_encoder"}} : {tipo: "nenhum"};
+    salvarDepois(); desenhar(); editor();
+    toast("Limpo ✓");
+  };
+}
+
+// Ajustes do aparelho (globais, fora dos perfis): o servidor corrige o sinal ao receber
+function ligarInverter(ehEnc, num) {
+  const cb = $("#inverter");
+  cfg.invertidos = cfg.invertidos || [];
+  cb.checked = ehEnc ? cfg.invertidos.includes(num) : !!cfg.teclas_invertidas;
+  cb.onchange = () => {
+    if (ehEnc) {
+      cfg.invertidos = cfg.invertidos.filter(n => n !== num).concat(cb.checked ? [num] : []);
+      api("/api/config", {invertidos: cfg.invertidos});
+    } else {
+      cfg.teclas_invertidas = cb.checked;
+      api("/api/config", {teclas_invertidas: cb.checked});
+    }
+    toast(cb.checked ? "Invertido ✓" : "Ordem normal ✓");
+  };
+}
+
+function editorBotao(a, mudou) {
+  const caixa = $("#botao-enc"), lig = caixa.querySelector(".ligacao");
+  a.botao = a.botao || {tipo: "nenhum"};
+  const nota = (cfg.botoes || {})[selecionado];
+  if (detectando === selecionado) {
+    lig.innerHTML = `<div class="linha" style="align-items:center;margin-bottom:12px">
+      <span style="flex:1">Aperte o encoder no controlador…</span><button>Cancelar</button></div>`;
+    lig.querySelector("button").onclick = () => { detectando = null; editor(); };
+  } else {
+    lig.innerHTML = `<div class="linha" style="align-items:center;margin-bottom:6px">
+      <span style="flex:1">${nota != null ? `Ligado à nota <b>${nota}</b>` : "Ainda não sei qual sinal o botão manda."}</span>
+      <button>${nota != null ? "Detectar de novo" : "Detectar"}</button>
+      ${nota != null ? `<button title="Volta a ser uma tecla comum">Desligar</button>` : ""}</div>
+      <div class="dica" style="margin-bottom:12px">Clique em Detectar e aperte este encoder no controlador.
+      Se nada acontecer, o botão não está ligado no Arduino.</div>`;
+    const [det, desl] = lig.querySelectorAll("button");
+    det.onclick = () => { detectando = selecionado; editor(); };
+    if (desl) desl.onclick = () => {
+      delete cfg.botoes[selecionado];
+      api("/api/config", {botoes: cfg.botoes}); desenhar(); editor();
+    };
+  }
+  campoAcao(caixa.querySelector(".acao-botao"), a.botao, TIPOS_BOTAO_ENCODER, mudou);
+}
+
+function ligarBotao(encoder, numNota) {
+  cfg.botoes = cfg.botoes || {};
+  for (const k in cfg.botoes) if (cfg.botoes[k] === numNota) delete cfg.botoes[k];   // uma nota, um encoder
+  cfg.botoes[encoder] = numNota;
+  const a = cfg.controles[encoder] || (cfg.controles[encoder] = {tipo: "nenhum"});
+  a.botao = a.botao || {tipo: "mudo_encoder"};
+  if (!a.botao.tipo || a.botao.tipo === "nenhum") a.botao.tipo = "mudo_encoder";
+  detectando = null;
+  api("/api/config", {botoes: cfg.botoes, controles: cfg.controles});
+  desenhar(); if (selecionado) editor();
+}
+
+// ---------------- calibração (girar e apertar cada knob, na ordem física) ----------------
+const LUGAR = ["de cima, à esquerda", "de cima, à direita", "de baixo, no meio", "de baixo, à direita"];
+
+async function iniciarCalib() {
+  detectando = null;
+  calib = {passo: 0, fase: "girar", novo: [null, null, null, null], botoes: {}, ativoAntes: cfg.ativo !== false};
+  if (calib.ativoAntes) await api("/api/config", {ativo: false});   // não disparar nada enquanto calibra
+  $("#ativo").checked = false;
+  avisoCalib(); desenhar();
+}
+
+async function terminarCalib(salvar) {
+  const c = calib; calib = null;
+  if (salvar) {
+    const sobra = ENCODERS.filter(cc => !c.novo.includes(cc));
+    cfg.layout = c.novo.map(cc => cc ?? sobra.shift());
+    cfg.botoes = {};
+    for (const cc of ENCODERS) {
+      if (c.botoes[cc] == null) continue;                 // pulado: esse knob não tem botão
+      cfg.botoes["cc:" + cc] = c.botoes[cc];
+      const a = cfg.controles["cc:" + cc] || (cfg.controles["cc:" + cc] = {tipo: "nenhum"});
+      a.botao = a.botao || {tipo: "mudo_encoder"};
+      if (!a.botao.tipo || a.botao.tipo === "nenhum") a.botao.tipo = "mudo_encoder";
+    }
+    cfg.calibrado = true;
+  }
+  cfg.ativo = c.ativoAntes;
+  $("#ativo").checked = c.ativoAntes;
+  await api("/api/config", salvar ? {controles: cfg.controles, layout: cfg.layout, botoes: cfg.botoes,
+                                     calibrado: true, ativo: c.ativoAntes}
+                                  : {ativo: c.ativoAntes});
+  avisoCalib(); desenhar(); if (selecionado) editor();
+}
+
+function tratarCalib(ev) {
+  const num = +ev.chave.split(":")[1];
+  if (calib.fase === "girar" && ev.tipo === "cc" && ENCODERS.includes(num) && !calib.novo.includes(num)) {
+    calib.novo[calib.passo] = num;
+    calib.fase = "apertar";
+  } else if (calib.fase === "apertar" && ev.tipo === "note_on") {
+    for (const cc in calib.botoes) if (calib.botoes[cc] === num) calib.botoes[cc] = null;
+    calib.botoes[calib.novo[calib.passo]] = num;
+    proximoPasso(); return;
+  } else return;
+  avisoCalib(); desenhar();
+}
+
+function proximoPasso() {
+  calib.passo++; calib.fase = "girar";
+  if (calib.passo >= 4) { terminarCalib(true); return; }
+  avisoCalib(); desenhar();
+}
+
+function avisoCalib() {
+  const av = $("#aviso-calib");
+  if (calib) {
+    const p = calib.passo;
+    av.innerHTML = calib.fase === "girar"
+      ? `🎯 <b>Passo ${p + 1} de 4:</b> gire o encoder ${LUGAR[p]} (o que está piscando na tela).
+         <button id="calib-cancelar">Cancelar</button>`
+      : `🎯 <b>Passo ${p + 1} de 4:</b> agora <b>aperte</b> esse mesmo encoder.
+         <button id="calib-pular" title="Use se este knob não tiver botão">Não tem botão</button><button id="calib-cancelar">Cancelar</button>`;
+    $("#calib-cancelar").onclick = () => terminarCalib(false);
+    if ($("#calib-pular")) $("#calib-pular").onclick = () => { calib.botoes[calib.novo[calib.passo]] = null; proximoPasso(); };
+  } else if (!cfg.calibrado) {
+    av.innerHTML = `Primeira vez? Calibre para o programa saber onde fica cada encoder e qual sinal o botão de cada um manda.
+      <button id="calib-iniciar" class="primario">🎯 Calibrar agora</button>`;
+    $("#calib-iniciar").onclick = iniciarCalib;
+  }
+  av.classList.toggle("mostra", !!calib || !cfg.calibrado);
+}
+
+function botoesTeste() {
+  const k = selecionado, a = cfg.controles[k] || {}, t = $("#testes");
+  if (!t) return;
+  let html = "";
+  if (a.tipo === "direcao") {
+    html = `<button data-lado="esquerda">Testar ◀ esquerda</button><button data-lado="direita">Testar direita ▶</button>`;
+  } else if (a.tipo && a.tipo !== "nenhum" && !a.tipo.startsWith("volume_")) {
+    html = `<button class="primario" data-lado="">Testar</button>`;
+  }
+  if (a.botao && a.botao.tipo && a.botao.tipo !== "nenhum") html += `<button data-lado="botao">Testar botão</button>`;
+  t.innerHTML = html + `<span id="salvo">✓ Salvo</span>`;
+  t.querySelectorAll("button").forEach(b => b.onclick = () => {
+    if (b.dataset.lado === "botao") testar(a.botao, b, {encoder: k});   // servidor resolve o "mudo do encoder"
+    else testar(b.dataset.lado ? a[b.dataset.lado] : a, b);
+  });
+}
+
+async function testar(acao, botao, extra = {}) {
+  if (!acao || acao.tipo === "nenhum") return;
+  // Atalho e texto vão para a janela em foco: dá 3 s para o usuário clicar onde quer
+  const atraso = ["atalho", "texto"].includes(acao.tipo) ? 3 : 0;
+  const original = botao.textContent;
+  try {
+    if (atraso) {
+      botao.disabled = true;
+      for (let s = atraso; s > 0; s--) { botao.textContent = `Clique na janela alvo… ${s}`; await new Promise(r => setTimeout(r, 1000)); }
+    }
+    await api("/api/testar", {acao, ...extra});
+    botao.textContent = "✓ Feito";
+  } catch (e) { botao.textContent = "Erro"; alert(e.message); }
+  setTimeout(() => { botao.textContent = original; botao.disabled = false; }, 1200);
+}
+
+// Desenha os campos de uma ação (reutilizado para cada lado do encoder)
+function campoAcao(alvo, a, tipos, mudou) {
+  const opcoes = Object.entries(tipos).map(([v, n]) => `<option value="${v}" ${a.tipo === v ? "selected" : ""}>${n}</option>`).join("");
+  alvo.innerHTML = `<div class="campo"><span>O que fazer</span><select class="tipo" style="width:100%">${opcoes}</select></div><div class="det"></div>`;
+  const det = alvo.querySelector(".det");
+  alvo.querySelector(".tipo").onchange = e => {
+    a.tipo = e.target.value;
+    a.valor = a.tipo === "midia" ? "playpause" : "";
+    delete a.saida; delete a.microfone;
+    if (a.tipo === "direcao") { a.esquerda = a.esquerda || {tipo: "midia", valor: "voldown"}; a.direita = a.direita || {tipo: "midia", valor: "volup"}; }
+    detalhes(); mudou();
+  };
+  function detalhes() {
+    const t = a.tipo || "nenhum";
+    if (t === "midia") {
+      det.innerHTML = `<div class="campo"><span>Tecla de mídia</span><select style="width:100%">${
+        Object.entries(midia).map(([v, n]) => `<option value="${v}" ${a.valor === v ? "selected" : ""}>${n}</option>`).join("")}</select></div>`;
+      det.querySelector("select").onchange = e => { a.valor = e.target.value; mudou(); };
+    } else if (t === "atalho") {
+      det.innerHTML = `<div class="campo"><span>Atalho</span><div class="linha">
+        <input type="text" placeholder="Ex.: Ctrl+Shift+M" value="${esc(a.valor || "")}"><button>⏺ Gravar</button></div>
+        <div class="dica">Clique em Gravar e aperte a combinação no teclado. Teclas com Win podem ser capturadas pelo Windows — nesse caso digite (ex.: Win+D).</div></div>`;
+      const inp = det.querySelector("input"), bt = det.querySelector("button");
+      inp.oninput = () => { a.valor = inp.value; mudou(); };
+      bt.onclick = () => gravarAtalho(bt, v => { inp.value = a.valor = v; mudou(); });
+    } else if (t === "abrir") {
+      det.innerHTML = `<div class="campo"><span>Caminho ou endereço</span>
+        <input type="text" placeholder="C:\\Program Files\\...\\app.exe  ou  https://..." value="${esc(a.valor || "")}">
+        <div class="dica">Pode ser programa (.exe), arquivo, pasta ou site. No Explorer: Shift + botão direito → “Copiar como caminho”.</div></div>`;
+      det.querySelector("input").oninput = e => { a.valor = e.target.value; mudou(); };
+    } else if (t === "texto") {
+      det.innerHTML = `<div class="campo"><span>Texto a digitar</span><textarea>${esc(a.valor || "")}</textarea>
+        <div class="dica">É digitado na janela que estiver em foco. Quebra de linha vira Enter.</div></div>`;
+      det.querySelector("textarea").oninput = e => { a.valor = e.target.value; mudou(); };
+    } else if (t === "comando") {
+      det.innerHTML = `<div class="campo"><span>Comando (cmd)</span><input type="text" placeholder="Ex.: shutdown /s /t 60" value="${esc(a.valor || "")}">
+        <div class="dica">Roda escondido, como no Prompt de Comando.</div></div>`;
+      det.querySelector("input").oninput = e => { a.valor = e.target.value; mudou(); };
+    } else if (t === "saida_som") {
+      det.innerHTML = `<div class="campo"><span>Mandar o som para</span><select style="width:100%"><option>carregando…</option></select>
+        <div class="dica">Vira a saída padrão do Windows (som, multimídia e chamadas). Os encoders de volume passam a controlar ela.</div></div>`;
+      const sel = det.querySelector("select");
+      api("/api/saidas-som").then(r => {
+        const saidas = r.saidas || [];
+        const guardada = a.valor && !saidas.some(s => s.id === a.valor)
+          ? `<option value="${esc(a.valor)}" selected>${esc(a.saida || "Saída guardada")} (desligada agora)</option>` : "";
+        sel.innerHTML = `<option value="">Próxima saída (vai alternando entre todas)</option>${guardada}` +
+          saidas.map(s => `<option value="${esc(s.id)}" ${a.valor === s.id ? "selected" : ""}>${esc(s.nome)}${s.padrao ? " — tocando agora" : ""}</option>`).join("");
+        sel.onchange = () => {
+          const s = saidas.find(x => x.id === sel.value);
+          a.valor = sel.value;
+          if (s) a.saida = s.nome; else if (!sel.value) delete a.saida;
+          mudou();
+        };
+      }).catch(e => sel.innerHTML = `<option>Não consegui listar: ${esc(e.message)}</option>`);
+    } else if (t === "perfil") {
+      const nomes = Object.keys(cfg.perfis || {});
+      det.innerHTML = `<div class="campo"><span>Ir para</span><select style="width:100%">
+        <option value="">Próximo perfil (vai passando pela lista)</option>
+        ${nomes.map(n => `<option value="${esc(n)}" ${a.valor === n ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
+        <div class="dica">Dica: coloque esta função na mesma tecla em todos os perfis, senão ao trocar você perde o jeito de voltar.</div></div>`;
+      det.querySelector("select").onchange = e => { a.valor = e.target.value; mudou(); };
+    } else if (t === "volume_sistema") {
+      det.innerHTML = `<div class="dica" style="margin-bottom:12px">Girar o encoder muda o volume geral (0% a 100%).</div>`;
+    } else if (t === "volume_microfone") {
+      det.innerHTML = `<div class="campo"><span>Microfone</span><select style="width:100%"><option>carregando…</option></select>
+        <div class="dica">Girar muda o volume de entrada do microfone (0% a 100%). Apertar o encoder liga/desliga o mudo dele.</div></div>`;
+      const sel = det.querySelector("select");
+      api("/api/microfones").then(r => {
+        const mics = r.microfones || [];
+        const atual = mics.find(m => m.padrao);
+        const guardado = a.valor && !mics.some(m => m.id === a.valor)
+          ? `<option value="${esc(a.valor)}" selected>${esc(a.microfone || "Microfone guardado")} (desligado agora)</option>` : "";
+        sel.innerHTML = `<option value="">Microfone padrão do Windows${atual ? " (agora: " + esc(atual.nome) + ")" : ""}</option>${guardado}` +
+          mics.map(m => `<option value="${esc(m.id)}" ${a.valor === m.id ? "selected" : ""}>${esc(m.nome)}</option>`).join("");
+        sel.onchange = () => {
+          const m = mics.find(x => x.id === sel.value);
+          a.valor = sel.value;
+          if (m) a.microfone = m.nome; else if (!sel.value) delete a.microfone;
+          mudou();
+        };
+      }).catch(e => sel.innerHTML = `<option>Não consegui listar: ${esc(e.message)}</option>`);
+    } else if (t === "volume_app") {
+      det.innerHTML = `<div class="campo"><span>Programa(s)</span><input type="text" placeholder="Ex.: spotify.exe, chrome.exe" value="${esc(a.valor || "")}">
+        <div class="dica">Separe vários por vírgula. Tocando som agora (clique para adicionar):</div>
+        <div class="chips">carregando…</div></div>`;
+      const inp = det.querySelector("input"), chips = det.querySelector(".chips");
+      inp.oninput = () => { a.valor = inp.value; mudou(); };
+      api("/api/apps-audio").then(r => {
+        const apps = r.apps || [];
+        chips.innerHTML = apps.length ? apps.map(n => `<button class="chip">${esc(n)}</button>`).join("")
+                                      : `<span class="dica">nenhum programa com som aberto — abra o programa e volte aqui</span>`;
+        chips.querySelectorAll(".chip").forEach(c => c.onclick = () => {
+          const lista = inp.value.split(",").map(s => s.trim()).filter(Boolean);
+          if (!lista.includes(c.textContent)) lista.push(c.textContent);
+          inp.value = a.valor = lista.join(", "); mudou();
+        });
+      }).catch(() => chips.textContent = "");
+    } else if (t === "direcao") {
+      det.innerHTML = `<div class="sub"><h3>◀ Girar para a esquerda</h3><div class="esq"></div></div>
+        <div class="sub"><h3>Girar para a direita ▶</h3><div class="dir"></div></div>
+        <div class="dica" style="margin-bottom:12px">Obs.: o firmware para de enviar quando o knob chega em 0 ou 100; aí é preciso voltar um pouco.</div>`;
+      campoAcao(det.querySelector(".esq"), a.esquerda, TIPOS_TECLA, mudou);
+      campoAcao(det.querySelector(".dir"), a.direita, TIPOS_TECLA, mudou);
+    } else det.innerHTML = "";
+  }
+  detalhes();
+}
+
+const NOMES_CODE = {
+  Enter: "Enter", NumpadEnter: "Enter", Escape: "Esc", Tab: "Tab", Space: "Space", Backspace: "Backspace",
+  Delete: "Delete", Insert: "Insert", Home: "Home", End: "End", PageUp: "PageUp", PageDown: "PageDown",
+  ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right", PrintScreen: "PrintScreen",
+  CapsLock: "CapsLock", Pause: "Pause", ContextMenu: "Menu", Semicolon: ";", Equal: "=", Comma: ",",
+  Minus: "-", Period: ".", Slash: "/", Backquote: "`", BracketLeft: "[", Backslash: "\\", BracketRight: "]", Quote: "'",
+};
+function nomeTecla(code) {
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  if (/^Digit\d$/.test(code)) return code.slice(5);
+  if (/^Numpad\d$/.test(code)) return "Num" + code.slice(6);
+  if (/^F\d{1,2}$/.test(code)) return code;
+  return NOMES_CODE[code];
+}
+function gravarAtalho(bt, pronto) {
+  bt.classList.add("gravando"); bt.textContent = "Aperte…";
+  function fim() { window.removeEventListener("keydown", tecla, true); bt.classList.remove("gravando"); bt.textContent = "⏺ Gravar"; }
+  function tecla(e) {
+    e.preventDefault(); e.stopPropagation();
+    if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;   // espera a tecla principal
+    const nome = nomeTecla(e.code);
+    if (!nome) return;
+    const partes = [];
+    if (e.ctrlKey) partes.push("Ctrl");
+    if (e.shiftKey) partes.push("Shift");
+    if (e.altKey) partes.push("Alt");
+    if (e.metaKey) partes.push("Win");
+    partes.push(nome);
+    fim(); pronto(partes.join("+"));
+  }
+  window.addEventListener("keydown", tecla, true);
+}
+
+function desenharMantendo() {   // redesenha o controlador sem perder o foco do editor
+  desenhar();
+}
+
+let timerSalvar, gravarPendente = null;
+function salvarDepois() {
+  clearTimeout(timerSalvar);
+  // guarda de qual perfil são os controles, caso o perfil troque antes de gravar
+  const dados = {controles: cfg.controles, perfil: cfg.perfil_ativo};
+  gravarPendente = async () => {
+    gravarPendente = null;
+    try {
+      await api("/api/config", dados);
+      const s = $("#salvo"); if (s) { s.classList.add("mostra"); setTimeout(() => s.classList.remove("mostra"), 1200); }
+    } catch (e) { alert("Não salvou: " + e.message); }
+  };
+  timerSalvar = setTimeout(gravarPendente, 400);
+}
+async function salvarJa() {    // antes de trocar/criar/exportar perfil
+  clearTimeout(timerSalvar);
+  if (gravarPendente) await gravarPendente();
+}
+
+// ---------------- perfis ----------------
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg; t.classList.add("mostra");
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("mostra"), 3200);
+}
+
+// Caixinha própria (o prompt() do navegador nem sempre aparece na janela do app).
+// Com `inicial` === null não mostra campo de texto: vira uma confirmação. Devolve o texto, true ou null.
+function pedir(texto, inicial = "", ok = "OK") {
+  return new Promise(resolve => {
+    const dlg = $("#dlg"), inp = $("#dlg-input");
+    $("#dlg-txt").textContent = texto;
+    $("#dlg-ok").textContent = ok;
+    inp.hidden = inicial === null;
+    inp.value = inicial ?? "";
+    dlg.onclose = () => resolve(dlg.returnValue !== "ok" ? null : (inicial === null ? true : inp.value.trim() || null));
+    dlg.returnValue = "";
+    dlg.showModal();
+    if (!inp.hidden) inp.select();
+  });
+}
+
+function barraPerfis() {
+  const nomes = Object.keys(cfg.perfis || {});
+  $("#perfil").innerHTML = nomes.map(n =>
+    `<option value="${esc(n)}" ${n === cfg.perfil_ativo ? "selected" : ""}>${esc(n)}</option>`).join("");
+  $("#pf-excluir").disabled = nomes.length <= 1;
+  $("#pf-nome").textContent = cfg.perfil_ativo || "";
+}
+
+function recolherPerfis(sim) {
+  document.body.classList.toggle("perfis-recolhido", sim);
+  try { localStorage.setItem("perfisRecolhido", sim ? "1" : "0"); } catch {}
+}
+
+function aplicarConfig(nova) {    // depois de trocar/criar/importar perfil
+  cfg = nova;
+  if (selecionado) fecharEditor();
+  barraPerfis(); desenhar(); avisoCalib();
+}
+
+async function acaoPerfil(acao, novo = "") {
+  await salvarJa();
+  try {
+    const r = await api("/api/perfil", {acao, nome: cfg.perfil_ativo, novo});
+    aplicarConfig(r.config);
+    return true;
+  } catch (e) { toast(e.message); return false; }
+}
+
+async function lerArquivo(arquivo) {
+  await salvarJa();
+  try {
+    const dados = JSON.parse(await arquivo.text());
+    const r = await api("/api/perfil/importar", {dados});
+    aplicarConfig(r.config);
+    toast(r.novos.length === 1 ? `Perfil “${r.novos[0]}” importado — escolha-o na lista`
+                               : `${r.novos.length} perfis importados: ${r.novos.join(", ")}`);
+  } catch (e) {
+    toast(e instanceof SyntaxError ? "Esse arquivo não é um .json válido" : e.message);
+  }
+}
+
+function ligarBarraPerfis() {
+  let recolhido = true;                       // começa recolhida; depois lembra a última escolha
+  try { recolhido = localStorage.getItem("perfisRecolhido") !== "0"; } catch {}
+  recolherPerfis(recolhido);
+  $("#pf-recolher").onclick = () => recolherPerfis(true);
+  $("#pf-abrir").onclick = () => recolherPerfis(false);
+  $("#perfil").onchange = async e => {
+    await salvarJa();
+    const r = await api("/api/perfil", {acao: "trocar", nome: e.target.value});
+    aplicarConfig(r.config);
+    toast(`Perfil “${e.target.value}” ativo`);
+  };
+  $("#pf-novo").onclick = async () => {
+    const n = await pedir("Nome do novo perfil (começa vazio):", "", "Criar");
+    if (n) await acaoPerfil("criar", n);
+  };
+  $("#pf-duplicar").onclick = async () => {
+    const n = await pedir(`Nome da cópia de “${cfg.perfil_ativo}”:`, cfg.perfil_ativo + " (cópia)", "Duplicar");
+    if (n) await acaoPerfil("duplicar", n);
+  };
+  $("#pf-renomear").onclick = async () => {
+    const n = await pedir("Novo nome do perfil:", cfg.perfil_ativo, "Renomear");
+    if (n && n !== cfg.perfil_ativo) await acaoPerfil("renomear", n);
+  };
+  $("#pf-excluir").onclick = async () => {
+    const nome = cfg.perfil_ativo;
+    if (await pedir(`Excluir o perfil “${nome}”? Isso não pode ser desfeito (exporte antes se quiser guardar).`, null, "Excluir")
+        && await acaoPerfil("excluir")) toast(`Perfil “${nome}” excluído`);
+  };
+  const exportar = async nomes => {
+    await salvarJa();
+    try {
+      const r = await api("/api/perfil/exportar", {nomes});
+      toast("Salvo em " + r.caminho);
+    } catch (e) { toast(e.message); }
+  };
+  $("#pf-exportar").onclick = () => exportar([cfg.perfil_ativo]);
+  $("#pf-exportar-todos").onclick = () => exportar(Object.keys(cfg.perfis));
+  $("#pf-importar").onclick = () => $("#pf-arquivo").click();
+  $("#pf-arquivo").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) lerArquivo(f); };
+  // Também aceita arrastar o .json para dentro da janela
+  document.addEventListener("dragover", e => e.preventDefault());
+  document.addEventListener("drop", e => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f && /\.json$/i.test(f.name)) lerArquivo(f);
+  });
+}
+
+// ---------------- estado e eventos ----------------
+function status(e) {
+  $("#ponto").classList.toggle("on", e.conectado);
+  $("#status-txt").textContent = e.conectado ? "Conectado: " + e.dispositivo_aberto : "Desconectado";
+  const aviso = $("#aviso-midi");
+  aviso.textContent = e.conectado ? "" : (e.erro_midi || "Procurando o controlador…");
+  aviso.classList.toggle("mostra", !e.conectado);
+  const err = $("#aviso-erro");
+  err.textContent = e.ultimo_erro ? "Última falha ao executar: " + e.ultimo_erro : "";
+  err.classList.toggle("mostra", !!e.ultimo_erro);
+}
+
+function preencherDispositivos(lista, escolhido) {
+  const sel = $("#dispositivo");
+  const opcoes = [["", "Automático (primeiro encontrado)"], ...lista.map(n => [n, n])];
+  if (escolhido && !lista.includes(escolhido)) opcoes.push([escolhido, escolhido + " (desconectado)"]);
+  sel.innerHTML = opcoes.map(([v, n]) => `<option value="${esc(v)}" ${v === escolhido ? "selected" : ""}>${esc(n)}</option>`).join("");
+}
+
+async function iniciar() {
+  let e;
+  try { e = await api("/api/estado"); }
+  catch { setTimeout(iniciar, 1000); return; }   // servidor ainda subindo
+
+  cfg = e.config; midia = e.midia; valores = e.valores_cc; seq = e.seq; mudos = e.mudos || {};
+  $("#ativo").checked = cfg.ativo !== false;
+  $("#seguir").checked = !!cfg.selecionar_ao_apertar;    // desligado por padrão
+  $("#barra-volume").checked = cfg.barra_volume !== false;
+  preencherDispositivos(e.dispositivos, cfg.dispositivo || "");
+  status(e); desenhar(); avisoCalib(); barraPerfis(); ligarBarraPerfis();
+  $("#bt-calibrar").onclick = () => calib ? null : iniciarCalib();
+  // Recolhe o painel com Esc ou clicando fora dele (num espaço vazio, não em outro controle)
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape" && selecionado && !detectando) fecharEditor(); });
+  document.addEventListener("click", ev => {
+    if (selecionado && !ev.target.closest("#editor, .ctrl, header, .aviso") && document.contains(ev.target)) fecharEditor();
+  });
+  $("#ativo").onchange = ev => { cfg.ativo = ev.target.checked; api("/api/config", {ativo: ev.target.checked}); };
+  $("#barra-volume").onchange = ev => {
+    cfg.barra_volume = ev.target.checked; api("/api/config", {barra_volume: ev.target.checked});
+  };
+  $("#seguir").onchange = ev => {
+    cfg.selecionar_ao_apertar = ev.target.checked; api("/api/config", {selecionar_ao_apertar: ev.target.checked});
+  };
+  $("#dispositivo").onfocus = async () => {
+    const e2 = await api("/api/estado"); preencherDispositivos(e2.dispositivos, $("#dispositivo").value);
+  };
+  $("#dispositivo").onchange = ev => api("/api/config", {dispositivo: ev.target.value});
+  ouvir();
+}
+
+async function ouvir() {
+  while (true) {
+    try {
+      const r = await api("/api/eventos?desde=" + seq);
+      seq = r.seq; status(r);
+      mudos = r.mudos || {};
+      document.querySelectorAll('.ctrl[data-k^="cc:"]').forEach(el => el.classList.toggle("mudo", !!mudos[el.dataset.k]));
+      if (!calib && r.ativo !== cfg.ativo) { cfg.ativo = r.ativo; $("#ativo").checked = r.ativo; }   // mudou pela bandeja
+      if (r.perfil_ativo !== cfg.perfil_ativo) {      // trocado por uma tecla do controlador
+        await salvarJa();
+        aplicarConfig((await api("/api/estado")).config);
+        toast(`Perfil “${r.perfil_ativo}” ativo`);
+      }
+      for (const ev of r.eventos) {
+        if (calib) { tratarCalib(ev); continue; }
+        if (ev.tipo === "cc") {
+          valores[ev.chave] = ev.valor;
+          const el = document.querySelector(`.ctrl[data-k="${ev.chave}"]`);
+          if (el) { el.querySelector(".knob").outerHTML = knobSVG(ev.valor); acender(ev.chave, true);
+                    clearTimeout(el._t); el._t = setTimeout(() => acender(ev.chave, false), 200); }
+        } else {
+          if (detectando && ev.tipo === "note_on") { ligarBotao(detectando, +ev.chave.split(":")[1]); continue; }
+          acender(ev.dono || ev.chave, ev.tipo === "note_on");
+        }
+        const alvo = ev.dono || ev.chave;    // botão de encoder seleciona o encoder
+        if ((ev.tipo === "note_on" || ev.tipo === "cc") && $("#seguir").checked && selecionado !== alvo && !detectando
+            && document.querySelector(`.ctrl[data-k="${alvo}"]`)
+            && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+          selecionar(alvo);
+          if (ev.tipo === "note_on") acender(alvo, true);
+        }
+      }
+    } catch (e) {
+      $("#ponto").classList.remove("on"); $("#status-txt").textContent = "Programa fechado";
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    await new Promise(r => setTimeout(r, 120));
+  }
+}
+
+iniciar();
+</script>
+</body>
+</html>

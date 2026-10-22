@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# Dados de cada usuário (criados ao lado do programa)
+config.json
+config.json.tmp
+erro.log
+Perfis exportados/
+
+# Saída do PyInstaller
+build/
+dist/

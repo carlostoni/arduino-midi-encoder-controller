@@ -23,6 +23,17 @@ Não precisa instalar nada, nem o Python:
 
 Se o Windows SmartScreen avisar "Aplicativo não reconhecido", clique em **Mais informações → Executar assim mesmo**. O programa não é assinado.
 
+## Como é o programa
+
+![Tela principal do Controlador MIDI](docs/tela-principal.png)
+
+Os 4 knobs ficam em cima, na mesma posição do aparelho, e as 16 teclas embaixo, nas cores de cada fileira. Clique em um controle para escolher o que ele faz.
+
+Com o programa minimizado, girar um knob mostra uma barra de volume no canto da tela:
+
+![Barra de volume do Chrome](docs/barra-chrome.png)
+![Barra do microfone no mudo](docs/barra-microfone-mudo.png)
+
 ## Projeto montado
 ![midi](https://github.com/carlostoni/ArduinoMIDIEncoderController/assets/80012970/8bffcd88-4fce-4e25-b3d2-687adfa83afe)
 

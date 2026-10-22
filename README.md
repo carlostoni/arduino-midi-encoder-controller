@@ -29,9 +29,12 @@ Se o Windows SmartScreen avisar "Aplicativo não reconhecido", clique em **Mais 
 
 Os 4 knobs ficam em cima, na mesma posição do aparelho, e as 16 teclas embaixo, nas cores de cada fileira. Clique em um controle para escolher o que ele faz.
 
-Com o programa minimizado, girar um knob mostra uma barra de volume no canto da tela:
+Com o programa minimizado, girar um knob mostra uma barra de volume no canto de cima da tela, por cima de tudo. Ela some sozinha:
 
-![Barra de volume do Chrome](docs/barra-chrome.png)
+![Barra de volume do Chrome no canto da tela](docs/barra-volume-na-tela.jpg)
+
+Apertar o knob põe no mudo. A barra mostra o risco vermelho:
+
 ![Barra do microfone no mudo](docs/barra-microfone-mudo.png)
 
 ## Projeto montado

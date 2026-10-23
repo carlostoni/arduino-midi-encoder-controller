@@ -1,0 +1,1648 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Pinagem do Controlador MIDI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Bancada: placas como pinagem clicável à esquerda, ficha do pino à direita, esquema completo embaixo */
+:root {
+  --bg:#eef2f1; --paper:#fbfcfc; --fg:#17221e; --muted:#5d6d67; --line:#cfd9d5; --wire:#2a3732; --chip:#ffffff; --grid:#dde5e2;
+  --pcb:#1f4b45; --pcb-fg:#d9efe9; --gold:#c9a24a;
+  --i2c:#5a3ec2; --i2c-bg:#ece7fd; --vcc:#b3311e; --vcc-bg:#fbe6e2; --gnd:#45514c; --gnd-bg:#e2e8e5;
+  --row:#0a7861; --row-bg:#dcf3ec; --col:#9f5806; --col-bg:#fbecd5; --ana:#1d5dac; --ana-bg:#dfe9fb; --enc:#a0316a; --enc-bg:#fbe3ef;
+  --nc:#7b8783; --nc-bg:#eceff0;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg:#0d1412; --paper:#121b18; --fg:#dbe5e1; --muted:#90a29b; --line:#2b3934; --wire:#b8c7c1; --chip:#17211e; --grid:#1c2824;
+  --pcb:#163a35; --pcb-fg:#cfe9e2; --gold:#d8b462;
+  --i2c:#b5a3ff; --i2c-bg:#29224f; --vcc:#ff8b77; --vcc-bg:#3d1c16; --gnd:#aab7b2; --gnd-bg:#25302c;
+  --row:#52d7b4; --row-bg:#10362c; --col:#f2ab54; --col-bg:#3a2a10; --ana:#80b1f5; --ana-bg:#16294a; --enc:#f285b9; --enc-bg:#3c1a2c;
+  --nc:#7f8d88; --nc-bg:#1d2724;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg:#0d1412; --paper:#121b18; --fg:#dbe5e1; --muted:#90a29b; --line:#2b3934; --wire:#b8c7c1; --chip:#17211e; --grid:#1c2824;
+  --pcb:#163a35; --pcb-fg:#cfe9e2; --gold:#d8b462;
+  --i2c:#b5a3ff; --i2c-bg:#29224f; --vcc:#ff8b77; --vcc-bg:#3d1c16; --gnd:#aab7b2; --gnd-bg:#25302c;
+  --row:#52d7b4; --row-bg:#10362c; --col:#f2ab54; --col-bg:#3a2a10; --ana:#80b1f5; --ana-bg:#16294a; --enc:#f285b9; --enc-bg:#3c1a2c;
+  --nc:#7f8d88; --nc-bg:#1d2724;
+  color-scheme: dark; }
+* { box-sizing:border-box }
+body { background:var(--bg); color:var(--fg); font-family:var(--f-body); font-size:15px; line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:24px 48px }
+.wrap { max-width:1240px; margin:0 auto; display:grid; gap:26px }
+header { display:grid; gap:8px }
+.eyebrow { font-family:var(--f-mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted) }
+h1 { font-family:var(--f-display); font-weight:600; font-size:clamp(28px,4.6vw,40px); line-height:1.05; margin:0; text-wrap:balance }
+h2 { font-family:var(--f-display); font-weight:600; font-size:20px; margin:0 }
+p { margin:0; max-width:70ch }
+.lead { color:var(--muted) }
+button { font:inherit; color:inherit }
+button:focus-visible, .hit:focus-visible { outline:2px solid var(--fg); outline-offset:2px }
+
+.comps { display:flex; flex-wrap:wrap; gap:6px }
+.cb { font-family:var(--f-mono); font-size:12.5px; padding:5px 10px; border-radius:5px; border:1px solid var(--line); background:var(--paper); cursor:pointer }
+.cb:hover { border-color:var(--muted) }
+.cb.on { background:var(--fg); color:var(--paper); border-color:var(--fg) }
+
+.bench { display:grid; grid-template-columns:minmax(0,300px) minmax(0,300px) minmax(0,1fr); gap:22px; align-items:start }
+.board { display:grid; gap:0; min-width:0 }
+.board h2 { margin-bottom:8px }
+.board .cap { justify-self:center; font-family:var(--f-mono); font-size:10.5px; color:var(--pcb-fg); background:var(--pcb);
+  padding:4px 14px 2px; border-radius:6px 6px 0 0; letter-spacing:.06em }
+.board.dip .cap { border-radius:12px 12px 0 0; padding:6px 22px 2px }
+.pins { display:grid; grid-template-columns:minmax(0,1fr) 46px minmax(0,1fr); row-gap:3px }
+.mid { background:var(--pcb); margin-block:-2px }
+.pins .mid:first-of-type { border-radius:0 }
+.foot { justify-self:center; width:46px; height:12px; background:var(--pcb); border-radius:0 0 6px 6px }
+.pb { display:flex; align-items:center; gap:6px; min-height:32px; padding:4px 8px; border:1px solid var(--line); background:var(--paper);
+  cursor:pointer; position:relative; min-width:0 }
+.pb.l { justify-content:flex-end; border-radius:5px 0 0 5px; border-right:3px solid var(--gold) }
+.pb.r { justify-content:flex-start; border-radius:0 5px 5px 0; border-left:3px solid var(--gold); flex-direction:row-reverse }
+.pb .pl { font-family:var(--f-mono); font-size:12px; white-space:nowrap }
+.pb .pn { font-family:var(--f-mono); font-size:10.5px; font-weight:600; padding:0 5px; border-radius:3px; border:1px solid; white-space:nowrap }
+.pb.l .pn { margin-right:auto } .pb.r .pn { margin-left:auto }
+.pb:hover { border-color:var(--muted) }
+.pb.on { background:var(--fg); border-color:var(--fg) }
+.pb.on .pl { color:var(--paper) }
+.pb.cur { box-shadow:0 0 0 2px var(--fg) inset }
+.t-i2c { color:var(--i2c); background:var(--i2c-bg); border-color:var(--i2c) }
+.t-vcc { color:var(--vcc); background:var(--vcc-bg); border-color:var(--vcc) }
+.t-gnd { color:var(--gnd); background:var(--gnd-bg); border-color:var(--gnd) }
+.t-row { color:var(--row); background:var(--row-bg); border-color:var(--row) }
+.t-col { color:var(--col); background:var(--col-bg); border-color:var(--col) }
+.t-ana { color:var(--ana); background:var(--ana-bg); border-color:var(--ana) }
+.t-enc { color:var(--enc); background:var(--enc-bg); border-color:var(--enc) }
+.t-nc  { color:var(--nc);  background:var(--nc-bg);  border-color:var(--nc) }
+.cb.t-i2c, .cb.t-vcc, .cb.t-ana, .cb.t-enc, .cb.t-row { background:var(--paper) }
+.cb.on { color:var(--paper); background:var(--fg) }
+
+#info { position:sticky; top:16px; background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:18px 20px;
+  display:grid; gap:12px; min-width:0 }
+#info .src { font-family:var(--f-mono); font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em }
+#info h2 { font-size:24px; line-height:1.15 }
+#info h3 { margin:0; font-family:var(--f-mono); font-size:11.5px; font-weight:500; text-transform:uppercase; letter-spacing:.08em; color:var(--muted) }
+#info .tagline { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+#info .tag { font-family:var(--f-mono); font-size:12px; font-weight:600; padding:1px 8px; border-radius:4px; border:1px solid }
+#info ul { margin:0; padding:0; list-style:none; display:grid; gap:4px }
+#info li { display:flex; gap:8px; align-items:baseline; font-size:14.5px }
+#info li::before { content:""; flex:none; width:7px; height:7px; border-radius:50%; background:var(--gold); transform:translateY(-1px) }
+#info code { font-family:var(--f-mono); font-size:12.5px; background:var(--bg); border:1px solid var(--line); padding:6px 8px; border-radius:5px; display:block; overflow-x:auto; white-space:nowrap }
+#info .tip { font-size:14px; padding:10px 12px; border-radius:6px; background:var(--bg); border-left:3px solid var(--gold) }
+#info .grp { display:grid; gap:6px }
+#info .close { display:none }
+
+.sheet { overflow-x:auto; border:1px solid var(--line); border-radius:8px; background-color:var(--paper);
+  background-image:radial-gradient(var(--grid) 1px, transparent 1.2px); background-size:20px 20px }
+.sch { display:block; width:100%; min-width:1080px; height:auto }
+.sch text { font-family:var(--f-mono) }
+.w { stroke:var(--wire); stroke-width:1.5; fill:none; stroke-linecap:round }
+.w.bar, .w.plate { stroke-width:2.2 }
+.nc { stroke:var(--muted) }
+.jn { fill:var(--wire) }
+.chip { fill:var(--chip); stroke:var(--fg); stroke-width:1.5 }
+.screen { fill:var(--line) }
+.usb { fill:var(--line); stroke:var(--fg); stroke-width:1.2 }
+.notch { fill:var(--paper); stroke:var(--fg); stroke-width:1.2 }
+.ppad { fill:none; stroke:var(--muted) }
+.part { fill:var(--chip); stroke:var(--wire); stroke-width:1.5 }
+.dio, .arrowhead { fill:var(--wire) }
+.term { fill:var(--paper); stroke:var(--wire); stroke-width:1.3 }
+.knob { fill:var(--line); stroke:var(--fg); stroke-width:1.2 }
+.ghost { fill:none; stroke:var(--enc); stroke-dasharray:4 3 }
+.ghost-t { fill:var(--enc); font-size:11px }
+.pin { fill:var(--fg); font-size:12px }
+.pin.dim { fill:var(--muted) }
+.pnum, .sub, .note { fill:var(--muted); font-size:11px }
+.val { fill:var(--fg); font-size:11px }
+.lbl { fill:var(--fg); font-size:13px; font-weight:600 }
+.sch .ttl { font-family:var(--f-display); font-size:16px; font-weight:600; fill:var(--fg) }
+.flag polygon { stroke-width:1.2 }
+.flag text { font-size:11px; font-weight:600 }
+.n-i2c polygon { fill:var(--i2c-bg); stroke:var(--i2c) } .n-i2c text { fill:var(--i2c) }
+.n-vcc polygon { fill:var(--vcc-bg); stroke:var(--vcc) } .n-vcc text { fill:var(--vcc) }
+.n-gnd polygon { fill:var(--gnd-bg); stroke:var(--gnd) } .n-gnd text { fill:var(--gnd) }
+.n-row polygon { fill:var(--row-bg); stroke:var(--row) } .n-row text { fill:var(--row) }
+.n-col polygon { fill:var(--col-bg); stroke:var(--col) } .n-col text { fill:var(--col) }
+.n-ana polygon { fill:var(--ana-bg); stroke:var(--ana) } .n-ana text { fill:var(--ana) }
+.n-enc polygon { fill:var(--enc-bg); stroke:var(--enc) } .n-enc text { fill:var(--enc) }
+.hit { cursor:pointer; outline:none }
+.hitpad { fill:transparent }
+.hit:hover .w { stroke-width:2.2 }
+.sch .hit { transition:opacity .18s }
+.sch.sel .hit:not(.hi) { opacity:.16 }
+.sch .hit.hi .w { stroke:var(--fg); stroke-width:2.8 }
+.sch .hit.hi .flag polygon { stroke-width:2.4 }
+.sch .hit.hi .part, .sch .hit.hi .chip { stroke:var(--fg); stroke-width:2.6 }
+.sch .hit:focus-visible .hitpad { stroke:var(--fg); stroke-dasharray:3 3 }
+.hint { font-size:13px; color:var(--muted) }
+.sheet-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap }
+.clear { font-family:var(--f-mono); font-size:12.5px; padding:5px 10px; border-radius:5px; border:1px solid var(--line); background:var(--paper); cursor:pointer }
+
+.howto { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:26px; align-items:start }
+@media (max-width:900px) { .howto { grid-template-columns:minmax(0,1fr) } }
+.mcp-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:8px; background:var(--paper); padding:8px }
+.mcp-svg { display:block; width:100%; min-width:520px; height:auto }
+.mcp-svg text { font-family:var(--f-mono) }
+.mb { fill:var(--chip); stroke:var(--fg); stroke-width:1.4 }
+.mnotch { fill:var(--paper); stroke:var(--fg); stroke-width:1.2 }
+.mdot, .mpad { fill:var(--fg) }
+.mh { font-family:var(--f-display) !important; font-size:16px; font-weight:600; fill:var(--fg) }
+.mt { font-size:12px; fill:var(--fg) } .mt.b { font-weight:600 }
+.ms { font-size:11px; fill:var(--muted) } .ms.e { fill:var(--enc) }
+.ml { font-size:11px; font-weight:600; fill:var(--fg) }
+.ml.v { fill:var(--vcc) } .ml.g { fill:var(--gnd) } .ml.i { fill:var(--i2c) }
+.wv, .wg, .wi, .wi2, .wc { fill:none; stroke-width:2.2; stroke-linejoin:round }
+.wv { stroke:var(--vcc) } .wg { stroke:var(--gnd) } .wi { stroke:var(--i2c); stroke-dasharray:6 4 } .wi2 { stroke:var(--i2c) }
+.wc { stroke:var(--fg); stroke-width:1.6 }
+.dv { fill:var(--vcc) } .dg { fill:var(--gnd) }
+.steps { display:grid; gap:14px; margin:0; padding:0; list-style:none; counter-reset:st }
+.steps > li { display:grid; grid-template-columns:30px minmax(0,1fr); gap:10px; counter-increment:st }
+.steps > li::before { content:counter(st); width:26px; height:26px; border-radius:50%; background:var(--pcb); color:var(--pcb-fg);
+  font-family:var(--f-mono); font-size:13px; font-weight:600; display:grid; place-items:center }
+.steps h3 { margin:2px 0 4px; font-size:15.5px; font-weight:600 }
+.steps p { font-size:14.5px }
+.wires { width:100%; border-collapse:collapse; font-size:13.5px; margin-top:6px }
+.wires td { padding:6px 8px; border-bottom:1px solid var(--line) }
+.wires tr:last-child td { border-bottom:0 }
+.wires label { display:flex; gap:8px; align-items:center; cursor:pointer }
+.wires input { width:16px; height:16px; accent-color:var(--row) }
+.wires .k { font-family:var(--f-mono); font-size:12.5px; white-space:nowrap }
+.wires tr.done td { color:var(--muted); text-decoration:line-through }
+.progress { font-family:var(--f-mono); font-size:12px; color:var(--muted) }
+.module { font-size:14px; padding:10px 12px; border-radius:6px; background:var(--paper); border:1px solid var(--line) }
+
+
+.guides { display:grid; gap:34px }
+.g-top { display:grid; gap:10px }
+.g-title { font-size:28px !important }
+.g-nav { display:flex; flex-wrap:wrap; gap:6px }
+.gnav { text-decoration:none; color:var(--fg) }
+.gnav b { font-weight:600; display:inline-grid; place-items:center; width:18px; height:18px; border-radius:50%; background:var(--pcb); color:var(--pcb-fg); font-size:11px; margin-right:4px }
+.guide { display:grid; gap:12px; padding-top:22px; border-top:1px solid var(--line); scroll-margin-top:12px }
+.g-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap }
+.g-num { font-family:var(--f-mono); font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted) }
+.g-head .progress { margin-left:auto }
+.g-intro { color:var(--muted) }
+.g-side { display:grid; gap:18px; min-width:0 }
+.g-cl { margin:0 0 4px; font-family:var(--f-mono); font-size:11.5px; font-weight:500; text-transform:uppercase; letter-spacing:.08em; color:var(--muted) }
+.module code { font-family:var(--f-mono); font-size:13px }
+.mscreen { fill:var(--line) }
+.mpart { fill:var(--chip); stroke:var(--wire); stroke-width:1.6 }
+.mknob { fill:var(--line); stroke:var(--fg); stroke-width:1.2 }
+.mpin { fill:var(--gold) }
+.mterm { fill:var(--paper); stroke:var(--wire); stroke-width:1.4 }
+.wa, .we, .wr, .wcol, .wk, .wkb { fill:none; stroke-width:2.2; stroke-linejoin:round }
+.wa { stroke:var(--ana) } .we { stroke:var(--enc) } .wr { stroke:var(--row) } .wcol { stroke:var(--col) }
+.wk { stroke:var(--wire); stroke-width:1.6 } .wkb { stroke:var(--wire); stroke-width:3 }
+.da { fill:var(--ana) } .dr { fill:var(--row) } .di { fill:var(--i2c) } .dc { fill:var(--col) } .dr2 { fill:var(--row) } .dk { fill:var(--wire) }
+.ml.a { fill:var(--ana) } .ml.e { fill:var(--enc) } .ml.r { fill:var(--row) } .ml.c { fill:var(--col) }
+.wires tr.done td:last-child { text-decoration:line-through }
+
+@media (prefers-reduced-motion: reduce) { .sch .hit { transition:none } }
+
+@media (max-width:1000px) {
+  .bench { grid-template-columns:minmax(0,1fr) minmax(0,1fr) }
+  #info { grid-column:1 / -1; position:static; order:-1 }
+}
+@media (max-width:640px) {
+  .bench { grid-template-columns:minmax(0,1fr) }
+  #info { position:fixed; left:0; right:0; bottom:0; top:auto; z-index:20; max-height:46vh; overflow:auto; border-radius:14px 14px 0 0;
+    padding:14px max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+    box-shadow:0 -6px 24px rgba(0,0,0,.18); border-bottom:0 }
+  #info h2 { font-size:20px }
+  #info .close { display:block; position:absolute; top:10px; right:max(14px, env(safe-area-inset-right, 0px)); border:1px solid var(--line); background:var(--bg);
+    border-radius:5px; font-family:var(--f-mono); font-size:12px; padding:3px 8px; cursor:pointer }
+  body.sheet-open { padding-bottom:48vh }
+}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Pro Micro · MCP23017 · OLED · 4 faders · 5 encoders · matriz 7×5</div>
+  <h1>Pinagem do Controlador MIDI</h1>
+  <p class="lead">Clique em qualquer pino, componente ou fio para ver o que vai ligado nele. A ligação acende no esquema lá embaixo.</p>
+</header>
+
+<div class="comps" aria-label="Componentes"><button type="button" class="cb t-i2c" data-key="OLED">OLED</button><button type="button" class="cb t-ana" data-key="FAD1">Fader 1</button><button type="button" class="cb t-ana" data-key="FAD2">Fader 2</button><button type="button" class="cb t-ana" data-key="FAD3">Fader 3</button><button type="button" class="cb t-ana" data-key="FAD4">Fader 4</button><button type="button" class="cb t-enc" data-key="ENC1">Encoder 1</button><button type="button" class="cb t-enc" data-key="ENC2">Encoder 2</button><button type="button" class="cb t-enc" data-key="ENC3">Encoder 3</button><button type="button" class="cb t-enc" data-key="ENC4">Encoder 4</button><button type="button" class="cb t-enc" data-key="ENC5">Encoder 5</button><button type="button" class="cb t-row" data-key="BTN6">Pad n6</button><button type="button" class="cb t-vcc" data-key="CAP">Capacitor</button><button type="button" class="cb t-i2c" data-key="PULLUP">Pull-ups</button><a class="cb" href="#montagem" style="text-decoration:none">Guia de montagem ↓</a></div>
+
+<div class="bench">
+  <div class="board">
+    <h2>Pro Micro</h2>
+    <div class="cap">USB</div>
+    <div class="pins"><button type="button" class="pb l" data-key="LIN2" data-src="Pro Micro · TX0 · 1"><span class="pl">TX0 · 1</span><span class="pn t-row">LIN2</span></button><span class="mid"></span><button type="button" class="pb r" data-key="NC_RAW" data-src="Pro Micro · RAW"><span class="pl">RAW</span><span class="pn t-nc">—</span></button><button type="button" class="pb l" data-key="LIN1" data-src="Pro Micro · RX1 · 0"><span class="pl">RX1 · 0</span><span class="pn t-row">LIN1</span></button><span class="mid"></span><button type="button" class="pb r" data-key="GND" data-src="Pro Micro · GND"><span class="pl">GND</span><span class="pn t-gnd">GND</span></button><button type="button" class="pb l" data-key="GND" data-src="Pro Micro · GND"><span class="pl">GND</span><span class="pn t-gnd">GND</span></button><span class="mid"></span><button type="button" class="pb r" data-key="NC_RST" data-src="Pro Micro · RST"><span class="pl">RST</span><span class="pn t-nc">—</span></button><button type="button" class="pb l" data-key="GND" data-src="Pro Micro · GND"><span class="pl">GND</span><span class="pn t-gnd">GND</span></button><span class="mid"></span><button type="button" class="pb r" data-key="VCC" data-src="Pro Micro · VCC"><span class="pl">VCC</span><span class="pn t-vcc">VCC</span></button><button type="button" class="pb l" data-key="SDA" data-src="Pro Micro · 2 · SDA"><span class="pl">2 · SDA</span><span class="pn t-i2c">SDA</span></button><span class="mid"></span><button type="button" class="pb r" data-key="FD4" data-src="Pro Micro · A3 · 21"><span class="pl">A3 · 21</span><span class="pn t-ana">FD4</span></button><button type="button" class="pb l" data-key="SCL" data-src="Pro Micro · 3 · SCL"><span class="pl">3 · SCL</span><span class="pn t-i2c">SCL</span></button><span class="mid"></span><button type="button" class="pb r" data-key="FD3" data-src="Pro Micro · A2 · 20"><span class="pl">A2 · 20</span><span class="pn t-ana">FD3</span></button><button type="button" class="pb l" data-key="LIN3" data-src="Pro Micro · 4"><span class="pl">4</span><span class="pn t-row">LIN3</span></button><span class="mid"></span><button type="button" class="pb r" data-key="FD2" data-src="Pro Micro · A1 · 19"><span class="pl">A1 · 19</span><span class="pn t-ana">FD2</span></button><button type="button" class="pb l" data-key="LIN4" data-src="Pro Micro · 5"><span class="pl">5</span><span class="pn t-row">LIN4</span></button><span class="mid"></span><button type="button" class="pb r" data-key="FD1" data-src="Pro Micro · A0 · 18"><span class="pl">A0 · 18</span><span class="pn t-ana">FD1</span></button><button type="button" class="pb l" data-key="LIN5" data-src="Pro Micro · 6"><span class="pl">6</span><span class="pn t-row">LIN5</span></button><span class="mid"></span><button type="button" class="pb r" data-key="COL4" data-src="Pro Micro · 15"><span class="pl">15</span><span class="pn t-col">COL4</span></button><button type="button" class="pb l" data-key="LIN6" data-src="Pro Micro · 7"><span class="pl">7</span><span class="pn t-row">LIN6</span></button><span class="mid"></span><button type="button" class="pb r" data-key="COL3" data-src="Pro Micro · 14"><span class="pl">14</span><span class="pn t-col">COL3</span></button><button type="button" class="pb l" data-key="LIN7" data-src="Pro Micro · 8"><span class="pl">8</span><span class="pn t-row">LIN7</span></button><span class="mid"></span><button type="button" class="pb r" data-key="COL5" data-src="Pro Micro · 16"><span class="pl">16</span><span class="pn t-col">COL5</span></button><button type="button" class="pb l" data-key="COL1" data-src="Pro Micro · 9"><span class="pl">9</span><span class="pn t-col">COL1</span></button><span class="mid"></span><button type="button" class="pb r" data-key="COL2" data-src="Pro Micro · 10"><span class="pl">10</span><span class="pn t-col">COL2</span></button></div>
+    <div class="foot"></div>
+  </div>
+  <div class="board dip">
+    <h2>MCP23017</h2>
+    <div class="cap">DIP-28</div>
+    <div class="pins"><button type="button" class="pb l" data-key="E1B" data-src="MCP23017 · pino 1 (GPB0)"><span class="pl">1 GPB0</span><span class="pn t-enc">E1B</span></button><span class="mid"></span><button type="button" class="pb r" data-key="NC_OUT" data-src="MCP23017 · pino 28 (GPA7)"><span class="pl">GPA7 28</span><span class="pn t-nc">—</span></button><button type="button" class="pb l" data-key="E2B" data-src="MCP23017 · pino 2 (GPB1)"><span class="pl">2 GPB1</span><span class="pn t-enc">E2B</span></button><span class="mid"></span><button type="button" class="pb r" data-key="NC_FREE" data-src="MCP23017 · pino 27 (GPA6)"><span class="pl">GPA6 27</span><span class="pn t-nc">—</span></button><button type="button" class="pb l" data-key="E3B" data-src="MCP23017 · pino 3 (GPB2)"><span class="pl">3 GPB2</span><span class="pn t-enc">E3B</span></button><span class="mid"></span><button type="button" class="pb r" data-key="NC_FREE" data-src="MCP23017 · pino 26 (GPA5)"><span class="pl">GPA5 26</span><span class="pn t-nc">—</span></button><button type="button" class="pb l" data-key="E4B" data-src="MCP23017 · pino 4 (GPB3)"><span class="pl">4 GPB3</span><span class="pn t-enc">E4B</span></button><span class="mid"></span><button type="button" class="pb r" data-key="E5A" data-src="MCP23017 · pino 25 (GPA4)"><span class="pl">GPA4 25</span><span class="pn t-enc">E5A</span></button><button type="button" class="pb l" data-key="E5B" data-src="MCP23017 · pino 5 (GPB4)"><span class="pl">5 GPB4</span><span class="pn t-enc">E5B</span></button><span class="mid"></span><button type="button" class="pb r" data-key="E4A" data-src="MCP23017 · pino 24 (GPA3)"><span class="pl">GPA3 24</span><span class="pn t-enc">E4A</span></button><button type="button" class="pb l" data-key="NC_FREE" data-src="MCP23017 · pino 6 (GPB5)"><span class="pl">6 GPB5</span><span class="pn t-nc">—</span></button><span class="mid"></span><button type="button" class="pb r" data-key="E3A" data-src="MCP23017 · pino 23 (GPA2)"><span class="pl">GPA2 23</span><span class="pn t-enc">E3A</span></button><button type="button" class="pb l" data-key="NC_FREE" data-src="MCP23017 · pino 7 (GPB6)"><span class="pl">7 GPB6</span><span class="pn t-nc">—</span></button><span class="mid"></span><button type="button" class="pb r" data-key="E2A" data-src="MCP23017 · pino 22 (GPA1)"><span class="pl">GPA1 22</span><span class="pn t-enc">E2A</span></button><button type="button" class="pb l" data-key="NC_OUT" data-src="MCP23017 · pino 8 (GPB7)"><span class="pl">8 GPB7</span><span class="pn t-nc">—</span></button><span class="mid"></span><button type="button" class="pb r" data-key="E1A" data-src="MCP23017 · pino 21 (GPA0)"><span class="pl">GPA0 21</span><span class="pn t-enc">E1A</span></button><button type="button" class="pb l" data-key="VCC" data-src="MCP23017 · pino 9 (VDD)"><span class="pl">9 VDD</span><span class="pn t-vcc">VCC</span></button><span class="mid"></span><button type="button" class="pb r" data-key="NC_INT" data-src="MCP23017 · pino 20 (INTA)"><span class="pl">INTA 20</span><span class="pn t-nc">—</span></button><button type="button" class="pb l" data-key="GND" data-src="MCP23017 · pino 10 (VSS)"><span class="pl">10 VSS</span><span class="pn t-gnd">GND</span></button><span class="mid"></span><button type="button" class="pb r" data-key="NC_INT" data-src="MCP23017 · pino 19 (INTB)"><span class="pl">INTB 19</span><span class="pn t-nc">—</span></button><button type="button" class="pb l" data-key="NC_NC" data-src="MCP23017 · pino 11 (NC)"><span class="pl">11 NC</span><span class="pn t-nc">—</span></button><span class="mid"></span><button type="button" class="pb r" data-key="VCC" data-src="MCP23017 · pino 18 (RESET)"><span class="pl">RESET 18</span><span class="pn t-vcc">VCC</span></button><button type="button" class="pb l" data-key="SCL" data-src="MCP23017 · pino 12 (SCL)"><span class="pl">12 SCL</span><span class="pn t-i2c">SCL</span></button><span class="mid"></span><button type="button" class="pb r" data-key="GND" data-src="MCP23017 · pino 17 (A2)"><span class="pl">A2 17</span><span class="pn t-gnd">GND</span></button><button type="button" class="pb l" data-key="SDA" data-src="MCP23017 · pino 13 (SDA)"><span class="pl">13 SDA</span><span class="pn t-i2c">SDA</span></button><span class="mid"></span><button type="button" class="pb r" data-key="GND" data-src="MCP23017 · pino 16 (A1)"><span class="pl">A1 16</span><span class="pn t-gnd">GND</span></button><button type="button" class="pb l" data-key="NC_NC" data-src="MCP23017 · pino 14 (NC)"><span class="pl">14 NC</span><span class="pn t-nc">—</span></button><span class="mid"></span><button type="button" class="pb r" data-key="GND" data-src="MCP23017 · pino 15 (A0)"><span class="pl">A0 15</span><span class="pn t-gnd">GND</span></button></div>
+    <div class="foot"></div>
+  </div>
+  <aside id="info" aria-live="polite">
+    <button type="button" class="close" id="closeInfo">Fechar</button>
+    <div class="src" id="i-src"></div>
+    <h2 id="i-title"></h2>
+    <div class="tagline"><span class="tag" id="i-tag"></span></div>
+    <p id="i-desc"></p>
+    <div class="grp"><h3>Liga em</h3><ul id="i-ends"></ul></div>
+    <div class="grp" id="g-code"><h3>No código</h3><code id="i-code"></code></div>
+    <p class="tip" id="i-tip"></p>
+  </aside>
+</div>
+
+
+
+<section class="guides" id="montagem">
+  <div class="g-top">
+    <h2 class="g-title">Guia de montagem</h2>
+    <p class="g-intro">Monte nesta ordem. Cada etapa mostra só as ligações daquela parte e tem uma lista para marcar o que já foi feito.</p>
+    <nav class="g-nav" aria-label="Etapas"><a class="cb gnav" href="#g-mcp"><b>1</b> MCP23017</a><a class="cb gnav" href="#g-oled"><b>2</b> OLED</a><a class="cb gnav" href="#g-fad"><b>3</b> Faders</a><a class="cb gnav" href="#g-enc"><b>4</b> Encoders</a><a class="cb gnav" href="#g-mat"><b>5</b> Matriz</a></nav>
+    <p class="progress" id="prog-all"></p>
+  </div>
+  
+<section class="guide" id="g-mcp">
+  <div class="g-head"><span class="g-num">Etapa 1</span><h2>Expansor MCP23017</h2><span class="progress" id="prog-mcp"></span></div>
+  <p class="g-intro">São só 4 fios até o Pro Micro. O resto são ligações no próprio chip, para o VCC ou o GND.</p>
+  <div class="howto">
+    <div class="mcp-wrap"><svg class="mcp-svg" viewBox="0 0 680 440" role="img" aria-label="Ligação do MCP23017 ao Pro Micro"><rect class="mb" x="60" y="225" width="140" height="190" rx="8"/><text class="mh" x="60" y="210" text-anchor="start" dominant-baseline="central">Pro Micro</text><text class="mt" x="190" y="251" text-anchor="end" dominant-baseline="central">VCC</text><circle class="mpad" cx="196" cy="251" r="3"/><text class="mt" x="190" y="273" text-anchor="end" dominant-baseline="central">GND</text><circle class="mpad" cx="196" cy="273" r="3"/><text class="mt" x="190" y="317" text-anchor="end" dominant-baseline="central">3 · SCL</text><circle class="mpad" cx="196" cy="317" r="3"/><text class="mt" x="190" y="339" text-anchor="end" dominant-baseline="central">2 · SDA</text><circle class="mpad" cx="196" cy="339" r="3"/><text class="mt" x="190" y="400" text-anchor="end" dominant-baseline="central">GND</text><circle class="mpad" cx="196" cy="400" r="3"/><rect class="mb" x="400" y="60" width="140" height="320" rx="6"/><path class="mnotch" d="M458 60 a12 12 0 0 0 24 0"/><circle class="mdot" cx="412" cy="65" r="2.5"/><text class="mh" x="400" y="46" text-anchor="start" dominant-baseline="central">MCP23017</text><text class="ms e" x="410" y="75" text-anchor="start" dominant-baseline="central">1 GPB0</text><text class="ms e" x="410" y="97" text-anchor="start" dominant-baseline="central">2 GPB1</text><text class="ms e" x="410" y="119" text-anchor="start" dominant-baseline="central">3 GPB2</text><text class="ms e" x="410" y="141" text-anchor="start" dominant-baseline="central">4 GPB3</text><text class="ms e" x="410" y="163" text-anchor="start" dominant-baseline="central">5 GPB4</text><text class="ms" x="410" y="185" text-anchor="start" dominant-baseline="central">6 GPB5</text><text class="ms" x="410" y="207" text-anchor="start" dominant-baseline="central">7 GPB6</text><text class="ms" x="410" y="229" text-anchor="start" dominant-baseline="central">8 GPB7</text><text class="mt b" x="410" y="251" text-anchor="start" dominant-baseline="central">9 VDD</text><text class="mt b" x="410" y="273" text-anchor="start" dominant-baseline="central">10 VSS</text><text class="ms" x="410" y="295" text-anchor="start" dominant-baseline="central">11 NC</text><text class="mt b" x="410" y="317" text-anchor="start" dominant-baseline="central">12 SCL</text><text class="mt b" x="410" y="339" text-anchor="start" dominant-baseline="central">13 SDA</text><text class="ms" x="410" y="361" text-anchor="start" dominant-baseline="central">14 NC</text><text class="ms" x="530" y="75" text-anchor="end" dominant-baseline="central">GPA7 28</text><text class="ms" x="530" y="97" text-anchor="end" dominant-baseline="central">GPA6 27</text><text class="ms" x="530" y="119" text-anchor="end" dominant-baseline="central">GPA5 26</text><text class="ms e" x="530" y="141" text-anchor="end" dominant-baseline="central">GPA4 25</text><text class="ms e" x="530" y="163" text-anchor="end" dominant-baseline="central">GPA3 24</text><text class="ms e" x="530" y="185" text-anchor="end" dominant-baseline="central">GPA2 23</text><text class="ms e" x="530" y="207" text-anchor="end" dominant-baseline="central">GPA1 22</text><text class="ms e" x="530" y="229" text-anchor="end" dominant-baseline="central">GPA0 21</text><text class="ms" x="530" y="251" text-anchor="end" dominant-baseline="central">INTA 20</text><text class="ms" x="530" y="273" text-anchor="end" dominant-baseline="central">INTB 19</text><text class="mt b" x="530" y="295" text-anchor="end" dominant-baseline="central">RESET 18</text><text class="mt b" x="530" y="317" text-anchor="end" dominant-baseline="central">A2 17</text><text class="mt b" x="530" y="339" text-anchor="end" dominant-baseline="central">A1 16</text><text class="mt b" x="530" y="361" text-anchor="end" dominant-baseline="central">A0 15</text><text class="ms e" x="392" y="119" text-anchor="end" dominant-baseline="central">encoders B ←</text><text class="ms e" x="566" y="185" text-anchor="start" dominant-baseline="central">→ encoders (A)</text><path class="wv" d="M200 251 H400"/><path class="wv" d="M300 251 V24 H600 V295 H540"/><circle class="dv" cx="300" cy="251" r="3.5"/><text class="ml v" x="250" y="241" text-anchor="start" dominant-baseline="central">VCC</text><text class="ml v" x="450" y="12" text-anchor="middle" dominant-baseline="central">RESET (18) → VCC</text><path class="wg" d="M200 273 H400"/><text class="ml g" x="250" y="285" text-anchor="start" dominant-baseline="central">GND</text><path class="wc" d="M360 251 V258 M351 258 H369 M351 266 H369 M360 266 V273"/><circle class="dv" cx="360" cy="251" r="3"/><circle class="dg" cx="360" cy="273" r="3"/><text class="ml" x="352" y="238" text-anchor="middle" dominant-baseline="central">100 nF</text><path class="wi" d="M200 317 H400"/><text class="ml i" x="250" y="307" text-anchor="start" dominant-baseline="central">SCL</text><path class="wi2" d="M200 339 H400"/><text class="ml i" x="250" y="329" text-anchor="start" dominant-baseline="central">SDA</text><path class="wg" d="M540 317 H570 V400 H200"/><path class="wg" d="M540 339 H570 M540 361 H570"/><circle class="dg" cx="570" cy="339" r="3.5"/><circle class="dg" cx="570" cy="361" r="3.5"/><text class="ml g" x="385" y="412" text-anchor="middle" dominant-baseline="central">GND → A0, A1, A2</text></svg></div>
+    <div class="g-side">
+      <ol class="steps"><li><div><h3>Ache o pino 1</h3><p>Chanfro (meia-lua) para cima: o pino 1 é o primeiro da esquerda, ao lado do chanfro. A contagem desce pela esquerda (1–14) e sobe pela direita (15–28).</p></div></li><li><div><h3>Ligue os 4 fios até o Pro Micro</h3><p>VCC no pino 9, GND no pino 10, pino 3 do Pro Micro no 12 (SCL) e pino 2 no 13 (SDA).</p></div></li><li><div><h3>Feche as ligações do próprio chip</h3><p>RESET (18) no VCC, senão o chip fica reiniciando. A0, A1 e A2 (15–17) no GND, o que dá o endereço 0x20 usado no código.</p></div></li></ol>
+      <div><h3 class="g-cl">Confira</h3><table class="wires" data-g="mcp"><tbody><tr><td><label for="w-mcp-0"><input type="checkbox" id="w-mcp-0" data-w="mcp-0"><span class="k">Pro Micro VCC</span></label></td><td>→ pino 9 (VDD)</td></tr><tr><td><label for="w-mcp-1"><input type="checkbox" id="w-mcp-1" data-w="mcp-1"><span class="k">Pro Micro GND</span></label></td><td>→ pino 10 (VSS)</td></tr><tr><td><label for="w-mcp-2"><input type="checkbox" id="w-mcp-2" data-w="mcp-2"><span class="k">Pro Micro 3</span></label></td><td>→ pino 12 (SCL)</td></tr><tr><td><label for="w-mcp-3"><input type="checkbox" id="w-mcp-3" data-w="mcp-3"><span class="k">Pro Micro 2</span></label></td><td>→ pino 13 (SDA)</td></tr><tr><td><label for="w-mcp-4"><input type="checkbox" id="w-mcp-4" data-w="mcp-4"><span class="k">VCC</span></label></td><td>→ pino 18 (RESET)</td></tr><tr><td><label for="w-mcp-5"><input type="checkbox" id="w-mcp-5" data-w="mcp-5"><span class="k">GND</span></label></td><td>→ pinos 15, 16, 17 (A0–A2)</td></tr><tr><td><label for="w-mcp-6"><input type="checkbox" id="w-mcp-6" data-w="mcp-6"><span class="k">Capacitor 100 nF</span></label></td><td>→ entre os pinos 9 e 10</td></tr></tbody></table></div>
+    </div>
+  </div>
+  <p class="module"><strong>MCP23017 em módulo?</strong> Ligue VCC, GND, SDA e SCL pelos pinos marcados na placa e confira se A0–A2 e RST do módulo estão em GND e VCC. Alguns módulos deixam esses pinos soltos.</p>
+</section>
+<section class="guide" id="g-oled">
+  <div class="g-head"><span class="g-num">Etapa 2</span><h2>Display OLED</h2><span class="progress" id="prog-oled"></span></div>
+  <p class="g-intro">O OLED usa os mesmos dois fios do MCP23017. Os dois convivem porque têm endereços diferentes: 0x20 e 0x3C.</p>
+  <div class="howto">
+    <div class="mcp-wrap"><svg class="mcp-svg" viewBox="0 0 680 360" role="img" aria-label="Ligação do OLED no barramento I2C"><rect class="mb" x="40" y="90" width="140" height="160" rx="8"/><text class="mh" x="40" y="74" text-anchor="start" dominant-baseline="central">Pro Micro</text><text class="mt" x="170" y="120" text-anchor="end" dominant-baseline="central">GND</text><circle class="mpad" cx="176" cy="120" r="3"/><text class="mt" x="170" y="150" text-anchor="end" dominant-baseline="central">VCC</text><circle class="mpad" cx="176" cy="150" r="3"/><text class="mt" x="170" y="180" text-anchor="end" dominant-baseline="central">3 · SCL</text><circle class="mpad" cx="176" cy="180" r="3"/><text class="mt" x="170" y="210" text-anchor="end" dominant-baseline="central">2 · SDA</text><circle class="mpad" cx="176" cy="210" r="3"/><rect class="mb" x="470" y="80" width="170" height="170" rx="6"/><text class="mh" x="470" y="62" text-anchor="start" dominant-baseline="central">OLED 0,96" · 0x3C</text><rect class="mscreen" x="522" y="96" width="106" height="138" rx="3"/><text class="mt b" x="480" y="120" text-anchor="start" dominant-baseline="central">GND</text><circle class="mpad" cx="474" cy="120" r="3"/><text class="mt b" x="480" y="150" text-anchor="start" dominant-baseline="central">VCC</text><circle class="mpad" cx="474" cy="150" r="3"/><text class="mt b" x="480" y="180" text-anchor="start" dominant-baseline="central">SCL</text><circle class="mpad" cx="474" cy="180" r="3"/><text class="mt b" x="480" y="210" text-anchor="start" dominant-baseline="central">SDA</text><circle class="mpad" cx="474" cy="210" r="3"/><path class="wg" d="M180 120 H470"/><text class="ml g" x="230" y="110" text-anchor="start" dominant-baseline="central">GND</text><path class="wv" d="M180 150 H470"/><text class="ml v" x="230" y="140" text-anchor="start" dominant-baseline="central">VCC</text><path class="wi" d="M180 180 H470"/><text class="ml i" x="230" y="170" text-anchor="start" dominant-baseline="central">SCL</text><path class="wi2" d="M180 210 H470"/><text class="ml i" x="230" y="200" text-anchor="start" dominant-baseline="central">SDA</text><circle class="di" cx="300" cy="210" r="3.5"/><path class="wi2" d="M300 210 V290"/><circle class="di" cx="370" cy="180" r="3.5"/><path class="wi" d="M370 180 V204 a6 6 0 0 1 0 12 V290"/><rect class="mb" x="250" y="290" width="170" height="52" rx="6"/><text class="mt b" x="335" y="306" text-anchor="middle" dominant-baseline="central">MCP23017</text><text class="ms" x="335" y="326" text-anchor="middle" dominant-baseline="central">13 SDA · 12 SCL</text><text class="ms" x="470" y="290" text-anchor="start" dominant-baseline="central">Os dois ficam nos</text><text class="ms" x="470" y="306" text-anchor="start" dominant-baseline="central">mesmos fios SDA e SCL.</text></svg></div>
+    <div class="g-side">
+      <ol class="steps"><li><div><h3>Confira a ordem dos pinos</h3><p>Leia o que está impresso no módulo. A maioria é GND, VCC, SCL, SDA, mas alguns trazem VCC antes do GND. Inverter VCC e GND pode queimar o display.</p></div></li><li><div><h3>Ligue nos mesmos pinos do MCP</h3><p>SDA no pino 2 e SCL no pino 3 do Pro Micro, junto com os fios que já vão para o MCP. Pode ser uma emenda, uma trilha na placa ou um fio saindo do próprio pino do MCP.</p></div></li><li><div><h3>Alimente pelo Pro Micro</h3><p>VCC no VCC (5 V) e GND no GND. Os módulos comuns aceitam de 3,3 a 5 V.</p></div></li></ol>
+      <div><h3 class="g-cl">Confira</h3><table class="wires" data-g="oled"><tbody><tr><td><label for="w-oled-0"><input type="checkbox" id="w-oled-0" data-w="oled-0"><span class="k">OLED GND</span></label></td><td>→ GND do Pro Micro</td></tr><tr><td><label for="w-oled-1"><input type="checkbox" id="w-oled-1" data-w="oled-1"><span class="k">OLED VCC</span></label></td><td>→ VCC do Pro Micro</td></tr><tr><td><label for="w-oled-2"><input type="checkbox" id="w-oled-2" data-w="oled-2"><span class="k">OLED SCL</span></label></td><td>→ pino 3 (junto com o pino 12 do MCP)</td></tr><tr><td><label for="w-oled-3"><input type="checkbox" id="w-oled-3" data-w="oled-3"><span class="k">OLED SDA</span></label></td><td>→ pino 2 (junto com o pino 13 do MCP)</td></tr></tbody></table></div>
+    </div>
+  </div>
+  <p class="module"><strong>Tela preta?</strong> O endereço impresso atrás do módulo costuma ser 0x78, que é o mesmo 0x3C escrito de outro jeito. Se o display for de 1,3", troque no código para a linha SH1106.</p>
+</section>
+<section class="guide" id="g-fad">
+  <div class="g-head"><span class="g-num">Etapa 3</span><h2>4 faders</h2><span class="progress" id="prog-fad"></span></div>
+  <p class="g-intro">Cada fader tem 3 terminais: as duas pontas vão no VCC e no GND, e o cursor vai numa entrada analógica.</p>
+  <div class="howto">
+    <div class="mcp-wrap"><svg class="mcp-svg" viewBox="0 0 680 468" role="img" aria-label="Ligação dos 4 faders"><rect class="mb" x="120" y="380" width="540" height="56" rx="8"/><path class="wv" d="M210 64H230"/><text class="ml v" x="220" y="52" text-anchor="middle" dominant-baseline="central">VCC</text><path class="wv" d="M220 64 V100"/><rect class="mpart" x="211" y="100" width="18" height="160" rx="3"/><path class="wg" d="M220 260 V300"/><path class="wg" d="M208 300H232M212 306H228M216 312H224"/><text class="mt b" x="204" y="112" text-anchor="end" dominant-baseline="central">F1</text><path class="wa" d="M258 180 H234"/><polygon class="da" points="230,180 238,175 238,185"/><path class="wa" d="M258 180 V380"/><circle class="mpad" cx="258" cy="384" r="3"/><text class="mt b" x="258" y="400" text-anchor="middle" dominant-baseline="central">A0 · 18</text><path class="wv" d="M330 64H350"/><text class="ml v" x="340" y="52" text-anchor="middle" dominant-baseline="central">VCC</text><path class="wv" d="M340 64 V100"/><rect class="mpart" x="331" y="100" width="18" height="160" rx="3"/><path class="wg" d="M340 260 V300"/><path class="wg" d="M328 300H352M332 306H348M336 312H344"/><text class="mt b" x="324" y="112" text-anchor="end" dominant-baseline="central">F2</text><path class="wa" d="M378 180 H354"/><polygon class="da" points="350,180 358,175 358,185"/><path class="wa" d="M378 180 V380"/><circle class="mpad" cx="378" cy="384" r="3"/><text class="mt b" x="378" y="400" text-anchor="middle" dominant-baseline="central">A1 · 19</text><path class="wv" d="M450 64H470"/><text class="ml v" x="460" y="52" text-anchor="middle" dominant-baseline="central">VCC</text><path class="wv" d="M460 64 V100"/><rect class="mpart" x="451" y="100" width="18" height="160" rx="3"/><path class="wg" d="M460 260 V300"/><path class="wg" d="M448 300H472M452 306H468M456 312H464"/><text class="mt b" x="444" y="112" text-anchor="end" dominant-baseline="central">F3</text><path class="wa" d="M498 180 H474"/><polygon class="da" points="470,180 478,175 478,185"/><path class="wa" d="M498 180 V380"/><circle class="mpad" cx="498" cy="384" r="3"/><text class="mt b" x="498" y="400" text-anchor="middle" dominant-baseline="central">A2 · 20</text><path class="wv" d="M570 64H590"/><text class="ml v" x="580" y="52" text-anchor="middle" dominant-baseline="central">VCC</text><path class="wv" d="M580 64 V100"/><rect class="mpart" x="571" y="100" width="18" height="160" rx="3"/><path class="wg" d="M580 260 V300"/><path class="wg" d="M568 300H592M572 306H588M576 312H584"/><text class="mt b" x="564" y="112" text-anchor="end" dominant-baseline="central">F4</text><path class="wa" d="M618 180 H594"/><polygon class="da" points="590,180 598,175 598,185"/><path class="wa" d="M618 180 V380"/><circle class="mpad" cx="618" cy="384" r="3"/><text class="mt b" x="618" y="400" text-anchor="middle" dominant-baseline="central">A3 · 21</text><text class="ml a" x="242" y="160" text-anchor="start" dominant-baseline="central">cursor</text><text class="mh" x="132" y="422" text-anchor="start" dominant-baseline="central">Pro Micro</text><text class="ms" x="660" y="452" text-anchor="end" dominant-baseline="central">VCC e GND dos símbolos = pinos VCC e GND do Pro Micro</text></svg></div>
+    <div class="g-side">
+      <ol class="steps"><li><div><h3>Ache o cursor</h3><p>Com o multímetro em resistência: entre as duas pontas o valor fica fixo em 10 kΩ. O terminal cujo valor muda quando você move o fader é o cursor.</p></div></li><li><div><h3>Pontas no VCC e no GND</h3><p>Ligue todos na mesma orientação, com o VCC na ponta de cima. Se um fader ficar invertido (subir diminui o valor), troque as duas pontas dele.</p></div></li><li><div><h3>Cursor na entrada analógica</h3><p>Fader 1 em A0 (18), fader 2 em A1 (19), fader 3 em A2 (20) e fader 4 em A3 (21). Ficam no lado direito do Pro Micro.</p></div></li></ol>
+      <div><h3 class="g-cl">Confira</h3><table class="wires" data-g="fad"><tbody><tr><td><label for="w-fad-0"><input type="checkbox" id="w-fad-0" data-w="fad-0"><span class="k">Ponta de cima dos 4</span></label></td><td>→ VCC</td></tr><tr><td><label for="w-fad-1"><input type="checkbox" id="w-fad-1" data-w="fad-1"><span class="k">Ponta de baixo dos 4</span></label></td><td>→ GND</td></tr><tr><td><label for="w-fad-2"><input type="checkbox" id="w-fad-2" data-w="fad-2"><span class="k">Cursor do fader 1</span></label></td><td>→ A0 · pino 18 (CC 30)</td></tr><tr><td><label for="w-fad-3"><input type="checkbox" id="w-fad-3" data-w="fad-3"><span class="k">Cursor do fader 2</span></label></td><td>→ A1 · pino 19 (CC 31)</td></tr><tr><td><label for="w-fad-4"><input type="checkbox" id="w-fad-4" data-w="fad-4"><span class="k">Cursor do fader 3</span></label></td><td>→ A2 · pino 20 (CC 32)</td></tr><tr><td><label for="w-fad-5"><input type="checkbox" id="w-fad-5" data-w="fad-5"><span class="k">Cursor do fader 4</span></label></td><td>→ A3 · pino 21 (CC 33)</td></tr></tbody></table></div>
+    </div>
+  </div>
+  <p class="module"><strong>Linear ou logarítmico?</strong> Use faders lineares (marcação B10K). Os logarítmicos (A10K) funcionam, mas o valor muda de forma irregular ao longo do curso.</p>
+</section>
+<section class="guide" id="g-enc">
+  <div class="g-head"><span class="g-num">Etapa 4</span><h2>5 encoders</h2><span class="progress" id="prog-enc"></span></div>
+  <p class="g-intro">O giro vai no MCP23017 e o botão de apertar entra na matriz, na linha 1. O desenho mostra o encoder 1; os outros seguem a tabela.</p>
+  <div class="howto">
+    <div class="mcp-wrap"><svg class="mcp-svg" viewBox="0 0 680 430" role="img" aria-label="Ligação de um encoder"><rect class="mb" x="40" y="300" width="140" height="110" rx="6"/><text class="mh" x="40" y="284" text-anchor="start" dominant-baseline="central">MCP23017</text><text class="mt b" x="172" y="340" text-anchor="end" dominant-baseline="central">21 GPA0</text><text class="mt b" x="172" y="380" text-anchor="end" dominant-baseline="central">1 GPB0</text><circle class="mpad" cx="178" cy="340" r="3"/><circle class="mpad" cx="178" cy="380" r="3"/><rect class="mb" x="520" y="80" width="120" height="100" rx="8"/><text class="mh" x="520" y="64" text-anchor="start" dominant-baseline="central">Pro Micro</text><text class="mt b" x="528" y="110" text-anchor="start" dominant-baseline="central">0 · LIN1</text><text class="mt b" x="528" y="150" text-anchor="start" dominant-baseline="central">9 · COL1</text><circle class="mpad" cx="524" cy="110" r="3"/><circle class="mpad" cx="524" cy="150" r="3"/><rect class="mb" x="300" y="200" width="100" height="100" rx="10"/><circle class="mknob" cx="350" cy="250" r="26"/><circle class="mb" cx="350" cy="250" r="9"/><text class="mh" x="410" y="244" text-anchor="start" dominant-baseline="central">Encoder 1</text><text class="ms" x="410" y="264" text-anchor="start" dominant-baseline="central">vista de cima</text><rect class="mpin" x="316" y="300" width="8" height="12"/><rect class="mpin" x="346" y="300" width="8" height="12"/><rect class="mpin" x="376" y="300" width="8" height="12"/><rect class="mpin" x="326" y="188" width="8" height="12"/><rect class="mpin" x="366" y="188" width="8" height="12"/><text class="ms" x="320" y="287" text-anchor="middle" dominant-baseline="central">A</text><text class="ms" x="350" y="287" text-anchor="middle" dominant-baseline="central">C</text><text class="ms" x="380" y="287" text-anchor="middle" dominant-baseline="central">B</text><text class="ms" x="330" y="214" text-anchor="middle" dominant-baseline="central">SW</text><text class="ms" x="370" y="214" text-anchor="middle" dominant-baseline="central">SW</text><path class="we" d="M320 312 V340 H180"/><text class="ml e" x="250" y="330" text-anchor="start" dominant-baseline="central">A</text><path class="we" d="M380 312 V380 H180"/><text class="ml e" x="250" y="370" text-anchor="start" dominant-baseline="central">B</text><path class="wg" d="M350 312 V336"/><path class="wg" d="M338 336H362M342 342H358M346 348H354"/><text class="ml g" x="330" y="356" text-anchor="end" dominant-baseline="central">GND</text><path class="wcol" d="M370 188 V150 H520"/><text class="ml c" x="470" y="140" text-anchor="middle" dominant-baseline="central">COL1</text><path class="wr" d="M330 188 V110 H425"/><polygon class="dr" points="425,102 425,118 445,110"/><path class="wr" d="M445 102 V118"/><path class="wr" d="M445 110 H520"/><text class="ml" x="435" y="90" text-anchor="middle" dominant-baseline="central">1N4148</text><text class="ml r" x="482" y="100" text-anchor="middle" dominant-baseline="central">LIN1</text></svg></div>
+    <div class="g-side">
+      <ol class="steps"><li><div><h3>Identifique os pinos</h3><p>No EC11, o lado com 3 pinos é o giro: A, C (meio) e B. O lado com 2 pinos é o botão (SW).</p></div></li><li><div><h3>Giro no MCP</h3><p>A no GPA, B no GPB e C no GND. Encoder 1 usa GPA0/GPB0, encoder 2 usa GPA1/GPB1, e assim até o 5.</p></div></li><li><div><h3>Botão na matriz</h3><p>Um pino SW vai na coluna do encoder (COL1 a COL5). O outro passa por um diodo até LIN1 (pino 0), com a faixa do diodo do lado do pino 0.</p></div></li></ol>
+      <div><h3 class="g-cl">Confira</h3><table class="wires" data-g="enc"><tbody><tr><td><label for="w-enc-0"><input type="checkbox" id="w-enc-0" data-w="enc-0"><span class="k">Encoder 1</span></label></td><td>→ A no pino 21 · B no pino 1 · C no GND</td></tr><tr><td><label for="w-enc-1"><input type="checkbox" id="w-enc-1" data-w="enc-1"><span class="k">Encoder 2</span></label></td><td>→ A no pino 22 · B no pino 2 · C no GND</td></tr><tr><td><label for="w-enc-2"><input type="checkbox" id="w-enc-2" data-w="enc-2"><span class="k">Encoder 3</span></label></td><td>→ A no pino 23 · B no pino 3 · C no GND</td></tr><tr><td><label for="w-enc-3"><input type="checkbox" id="w-enc-3" data-w="enc-3"><span class="k">Encoder 4</span></label></td><td>→ A no pino 24 · B no pino 4 · C no GND</td></tr><tr><td><label for="w-enc-4"><input type="checkbox" id="w-enc-4" data-w="enc-4"><span class="k">Encoder 5</span></label></td><td>→ A no pino 25 · B no pino 5 · C no GND</td></tr><tr><td><label for="w-enc-5"><input type="checkbox" id="w-enc-5" data-w="enc-5"><span class="k">Botões SW</span></label></td><td>→ COL1–COL5 (pinos 9, 10, 14, 15, 16) e diodo → LIN1 (pino 0)</td></tr></tbody></table></div>
+    </div>
+  </div>
+  <p class="module"><strong>Girando ao contrário?</strong> Troque os fios A e B daquele encoder. Se o valor só mudar a cada 2 cliques, troque <code>pulsesPerDetent</code> para 2 no código. Os pinos 21–25 e 1–5 são do MCP23017.</p>
+</section>
+<section class="guide" id="g-mat">
+  <div class="g-head"><span class="g-num">Etapa 5</span><h2>Matriz de botões 7×5</h2><span class="progress" id="prog-mat"></span></div>
+  <p class="g-intro">Cada botão fica no cruzamento de uma linha (LIN) com uma coluna (COL). Com 12 fios o Pro Micro lê 35 botões.</p>
+  <div class="howto">
+    <div class="mcp-wrap"><svg class="mcp-svg" viewBox="0 0 680 350" role="img" aria-label="Ligação da matriz de botões"><path class="wr" d="M100 130 H420"/><text class="ml r" x="92" y="130" text-anchor="end" dominant-baseline="central">LIN2 · 1</text><text class="ml r" x="432" y="130" text-anchor="start" dominant-baseline="central">…</text><path class="wr" d="M100 210 H420"/><text class="ml r" x="92" y="210" text-anchor="end" dominant-baseline="central">LIN3 · 4</text><text class="ml r" x="432" y="210" text-anchor="start" dominant-baseline="central">…</text><path class="wr" d="M100 290 H420"/><text class="ml r" x="92" y="290" text-anchor="end" dominant-baseline="central">LIN4 · 5</text><text class="ml r" x="432" y="290" text-anchor="start" dominant-baseline="central">…</text><path class="wcol" d="M150 72 V250"/><text class="ml c" x="150" y="58" text-anchor="middle" dominant-baseline="central">COL1 · 9</text><path class="wcol" d="M250 72 V250"/><text class="ml c" x="250" y="58" text-anchor="middle" dominant-baseline="central">COL2 · 10</text><path class="wcol" d="M350 72 V250"/><text class="ml c" x="350" y="58" text-anchor="middle" dominant-baseline="central">COL3 · 14</text><text class="ms" x="250" y="322" text-anchor="middle" dominant-baseline="central">⋮  continua até LIN7 e COL5</text><circle class="dc" cx="150" cy="90" r="3"/><path class="wk" d="M150 90 H160"/><circle class="mterm" cx="162" cy="90" r="2.4"/><circle class="mterm" cx="188" cy="90" r="2.4"/><path class="wk" d="M164 89 L184 80 M190 90 H204 V98"/><polygon class="dk" points="198,98 210,98 204,112"/><path class="wk" d="M198 112 H210 M204 112 V130"/><circle class="dr2" cx="204" cy="130" r="3"/><text class="ms" x="214" y="92" text-anchor="start" dominant-baseline="central">n6</text><circle class="dc" cx="250" cy="90" r="3"/><path class="wk" d="M250 90 H260"/><circle class="mterm" cx="262" cy="90" r="2.4"/><circle class="mterm" cx="288" cy="90" r="2.4"/><path class="wk" d="M264 89 L284 80 M290 90 H304 V98"/><polygon class="dk" points="298,98 310,98 304,112"/><path class="wk" d="M298 112 H310 M304 112 V130"/><circle class="dr2" cx="304" cy="130" r="3"/><text class="ms" x="314" y="92" text-anchor="start" dominant-baseline="central">n7</text><circle class="dc" cx="350" cy="90" r="3"/><path class="wk" d="M350 90 H360"/><circle class="mterm" cx="362" cy="90" r="2.4"/><circle class="mterm" cx="388" cy="90" r="2.4"/><path class="wk" d="M364 89 L384 80 M390 90 H404 V98"/><polygon class="dk" points="398,98 410,98 404,112"/><path class="wk" d="M398 112 H410 M404 112 V130"/><circle class="dr2" cx="404" cy="130" r="3"/><text class="ms" x="414" y="92" text-anchor="start" dominant-baseline="central">n8</text><circle class="dc" cx="150" cy="170" r="3"/><path class="wk" d="M150 170 H160"/><circle class="mterm" cx="162" cy="170" r="2.4"/><circle class="mterm" cx="188" cy="170" r="2.4"/><path class="wk" d="M164 169 L184 160 M190 170 H204 V178"/><polygon class="dk" points="198,178 210,178 204,192"/><path class="wk" d="M198 192 H210 M204 192 V210"/><circle class="dr2" cx="204" cy="210" r="3"/><text class="ms" x="214" y="172" text-anchor="start" dominant-baseline="central">n11</text><circle class="dc" cx="250" cy="170" r="3"/><path class="wk" d="M250 170 H260"/><circle class="mterm" cx="262" cy="170" r="2.4"/><circle class="mterm" cx="288" cy="170" r="2.4"/><path class="wk" d="M264 169 L284 160 M290 170 H304 V178"/><polygon class="dk" points="298,178 310,178 304,192"/><path class="wk" d="M298 192 H310 M304 192 V210"/><circle class="dr2" cx="304" cy="210" r="3"/><text class="ms" x="314" y="172" text-anchor="start" dominant-baseline="central">n12</text><circle class="dc" cx="350" cy="170" r="3"/><path class="wk" d="M350 170 H360"/><circle class="mterm" cx="362" cy="170" r="2.4"/><circle class="mterm" cx="388" cy="170" r="2.4"/><path class="wk" d="M364 169 L384 160 M390 170 H404 V178"/><polygon class="dk" points="398,178 410,178 404,192"/><path class="wk" d="M398 192 H410 M404 192 V210"/><circle class="dr2" cx="404" cy="210" r="3"/><text class="ms" x="414" y="172" text-anchor="start" dominant-baseline="central">n13</text><circle class="dc" cx="150" cy="250" r="3"/><path class="wk" d="M150 250 H160"/><circle class="mterm" cx="162" cy="250" r="2.4"/><circle class="mterm" cx="188" cy="250" r="2.4"/><path class="wk" d="M164 249 L184 240 M190 250 H204 V258"/><polygon class="dk" points="198,258 210,258 204,272"/><path class="wk" d="M198 272 H210 M204 272 V290"/><circle class="dr2" cx="204" cy="290" r="3"/><text class="ms" x="214" y="252" text-anchor="start" dominant-baseline="central">n16</text><circle class="dc" cx="250" cy="250" r="3"/><path class="wk" d="M250 250 H260"/><circle class="mterm" cx="262" cy="250" r="2.4"/><circle class="mterm" cx="288" cy="250" r="2.4"/><path class="wk" d="M264 249 L284 240 M290 250 H304 V258"/><polygon class="dk" points="298,258 310,258 304,272"/><path class="wk" d="M298 272 H310 M304 272 V290"/><circle class="dr2" cx="304" cy="290" r="3"/><text class="ms" x="314" y="252" text-anchor="start" dominant-baseline="central">n17</text><circle class="dc" cx="350" cy="250" r="3"/><path class="wk" d="M350 250 H360"/><circle class="mterm" cx="362" cy="250" r="2.4"/><circle class="mterm" cx="388" cy="250" r="2.4"/><path class="wk" d="M364 249 L384 240 M390 250 H404 V258"/><polygon class="dk" points="398,258 410,258 404,272"/><path class="wk" d="M398 272 H410 M404 272 V290"/><circle class="dr2" cx="404" cy="290" r="3"/><text class="ms" x="414" y="252" text-anchor="start" dominant-baseline="central">n18</text><text class="mh" x="480" y="50" text-anchor="start" dominant-baseline="central">Uma tecla</text><path class="wcol" d="M500 74 V320"/><text class="ml c" x="500" y="330" text-anchor="middle" dominant-baseline="central">COL</text><circle class="dc" cx="500" cy="130" r="3.5"/><path class="wk" d="M500 130 H518"/><circle class="mterm" cx="522" cy="130" r="3.5"/><circle class="mterm" cx="578" cy="130" r="3.5"/><path class="wk" d="M525 128 L570 106"/><text class="ml" x="550" y="92" text-anchor="middle" dominant-baseline="central">botão</text><path class="wk" d="M582 130 H610 V180"/><polygon class="dk" points="596,180 624,180 610,214"/><path class="wkb" d="M596 214 H624"/><text class="ms" x="632" y="186" text-anchor="start" dominant-baseline="central">1N4148</text><text class="ml r" x="632" y="214" text-anchor="start" dominant-baseline="central">faixa</text><path class="wk" d="M610 214 V270"/><path class="wr" d="M480 270 H650"/><circle class="dr2" cx="610" cy="270" r="3.5"/><text class="ml r" x="650" y="290" text-anchor="end" dominant-baseline="central">LIN</text></svg></div>
+    <div class="g-side">
+      <ol class="steps"><li><div><h3>Linhas e colunas</h3><p>Um fio de linha passa por todos os botões da mesma fileira. Um fio de coluna passa por todos os botões da mesma coluna. Cada botão liga a sua coluna à sua linha.</p></div></li><li><div><h3>Um diodo por botão</h3><p>O 1N4148 fica em série com o botão, com a faixa (catodo) do lado da linha. Ele evita notas fantasmas quando vários botões são apertados juntos.</p></div></li><li><div><h3>Botões de 4 pernas</h3><p>Nos botões táteis comuns, as pernas do mesmo lado comprido já são ligadas por dentro. Use duas pernas em diagonal para não errar.</p></div></li></ol>
+      <div><h3 class="g-cl">Confira</h3><table class="wires" data-g="mat"><tbody><tr><td><label for="w-mat-0"><input type="checkbox" id="w-mat-0" data-w="mat-0"><span class="k">LIN1 · pino 0</span></label></td><td>→ botões dos encoders (notas 1–5)</td></tr><tr><td><label for="w-mat-1"><input type="checkbox" id="w-mat-1" data-w="mat-1"><span class="k">LIN2 · pino 1</span></label></td><td>→ pads n6–n10</td></tr><tr><td><label for="w-mat-2"><input type="checkbox" id="w-mat-2" data-w="mat-2"><span class="k">LIN3 · pino 4</span></label></td><td>→ pads n11–n15</td></tr><tr><td><label for="w-mat-3"><input type="checkbox" id="w-mat-3" data-w="mat-3"><span class="k">LIN4 · pino 5</span></label></td><td>→ pads n16–n20</td></tr><tr><td><label for="w-mat-4"><input type="checkbox" id="w-mat-4" data-w="mat-4"><span class="k">LIN5 · pino 6</span></label></td><td>→ pads n21–n25</td></tr><tr><td><label for="w-mat-5"><input type="checkbox" id="w-mat-5" data-w="mat-5"><span class="k">LIN6 · pino 7</span></label></td><td>→ pads n26–n30</td></tr><tr><td><label for="w-mat-6"><input type="checkbox" id="w-mat-6" data-w="mat-6"><span class="k">LIN7 · pino 8</span></label></td><td>→ botões de baixo n31–n35</td></tr><tr><td><label for="w-mat-7"><input type="checkbox" id="w-mat-7" data-w="mat-7"><span class="k">COL1 · pino 9</span></label></td><td>→ 1ª coluna</td></tr><tr><td><label for="w-mat-8"><input type="checkbox" id="w-mat-8" data-w="mat-8"><span class="k">COL2 · pino 10</span></label></td><td>→ 2ª coluna</td></tr><tr><td><label for="w-mat-9"><input type="checkbox" id="w-mat-9" data-w="mat-9"><span class="k">COL3 · pino 14</span></label></td><td>→ 3ª coluna</td></tr><tr><td><label for="w-mat-10"><input type="checkbox" id="w-mat-10" data-w="mat-10"><span class="k">COL4 · pino 15</span></label></td><td>→ 4ª coluna</td></tr><tr><td><label for="w-mat-11"><input type="checkbox" id="w-mat-11" data-w="mat-11"><span class="k">COL5 · pino 16</span></label></td><td>→ 5ª coluna</td></tr><tr><td><label for="w-mat-12"><input type="checkbox" id="w-mat-12" data-w="mat-12"><span class="k">Diodos</span></label></td><td>→ faixa do lado da linha em todos</td></tr></tbody></table></div>
+    </div>
+  </div>
+  <p class="module"><strong>Uma fileira inteira não funciona?</strong> Quase sempre é o fio da linha solto ou os diodos daquela linha invertidos. Um botão só não funciona? Confira as pernas em diagonal.</p>
+</section>
+</section>
+
+
+<section style="display:grid;gap:10px">
+  <div class="sheet-head">
+    <h2>Esquema</h2>
+    <button type="button" class="clear" id="clearSel">Mostrar tudo</button>
+  </div>
+  <div class="sheet" id="sheet"><svg id="sch" class="sch" viewBox="0 0 1400 1130" role="group" aria-label="Esquema elétrico interativo"><text class="ttl" x="960" y="26" text-anchor="start" dominant-baseline="central">Alimentação e I²C</text>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" aria-label="VCC · 5 V">
+<g class="flag n-vcc"><polygon points="990.0,66.0 983.0,58.0 952.0,58.0 952.0,74.0 983.0,74.0"/><text x="967.5" y="66" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+</g>
+<g class="hit" data-key="PULLUP" tabindex="0" role="button" data-comp="PULLUP" aria-label="Pull-ups do I²C">
+<line class="w" x1="990" y1="66" x2="1010" y2="66"/>
+<rect class="part" x="1010" y="60" width="50" height="12" rx="2"/>
+<line class="w" x1="1060" y1="66" x2="1080" y2="66"/>
+<text class="val" x="1035" y="51" text-anchor="middle" dominant-baseline="central">4,7 kΩ</text>
+</g>
+<g class="hit" data-key="SDA" tabindex="0" role="button" data-net="SDA" aria-label="SDA · dados I²C">
+<g class="flag n-i2c"><polygon points="1080.0,66.0 1087.0,58.0 1118.0,58.0 1118.0,74.0 1087.0,74.0"/><text x="1102.5" y="66" text-anchor="middle" dominant-baseline="central">SDA</text></g>
+</g>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" aria-label="VCC · 5 V">
+<g class="flag n-vcc"><polygon points="990.0,100.0 983.0,92.0 952.0,92.0 952.0,108.0 983.0,108.0"/><text x="967.5" y="100" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+</g>
+<g class="hit" data-key="PULLUP" tabindex="0" role="button" data-comp="PULLUP" aria-label="Pull-ups do I²C">
+<line class="w" x1="990" y1="100" x2="1010" y2="100"/>
+<rect class="part" x="1010" y="94" width="50" height="12" rx="2"/>
+<line class="w" x1="1060" y1="100" x2="1080" y2="100"/>
+<text class="val" x="1035" y="85" text-anchor="middle" dominant-baseline="central">4,7 kΩ</text>
+</g>
+<g class="hit" data-key="SCL" tabindex="0" role="button" data-net="SCL" aria-label="SCL · clock I²C">
+<g class="flag n-i2c"><polygon points="1080.0,100.0 1087.0,92.0 1118.0,92.0 1118.0,108.0 1087.0,108.0"/><text x="1102.5" y="100" text-anchor="middle" dominant-baseline="central">SCL</text></g>
+</g>
+<text class="note" x="960" y="124" text-anchor="start" dominant-baseline="central">Pull-ups opcionais: muitos módulos OLED já trazem.</text>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" aria-label="VCC · 5 V">
+<g class="flag n-vcc"><polygon points="1210.0,80.0 1203.0,72.0 1172.0,72.0 1172.0,88.0 1203.0,88.0"/><text x="1187.5" y="80" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+</g>
+<g class="hit" data-key="CAP" tabindex="0" role="button" data-comp="CAP" aria-label="Capacitor de desacoplamento">
+<line class="w" x1="1210" y1="80" x2="1250" y2="80"/>
+<line class="w plate" x1="1250" y1="68" x2="1250" y2="92"/>
+<line class="w plate" x1="1258" y1="68" x2="1258" y2="92"/>
+<line class="w" x1="1258" y1="80" x2="1290" y2="80"/>
+<text class="val" x="1254" y="56" text-anchor="middle" dominant-baseline="central">100 nF</text>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" aria-label="GND · terra">
+<g class="flag n-gnd"><polygon points="1290.0,80.0 1297.0,72.0 1328.0,72.0 1328.0,88.0 1297.0,88.0"/><text x="1312.5" y="80" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<text class="note" x="1180" y="106" text-anchor="start" dominant-baseline="central">Junto aos pinos 9 e 10 do MCP.</text>
+<text class="ttl" x="40" y="22" text-anchor="start" dominant-baseline="central">OLED 0,96&quot; I²C · 0x3C</text>
+<g class="hit" data-key="OLED" tabindex="0" role="button" data-comp="OLED" aria-label="Display OLED">
+<rect class="chip" x="40" y="38" width="140" height="88" rx="4"/>
+<rect class="screen" x="52" y="50" width="96" height="64" rx="2"/>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="OLED · pino GND" aria-label="GND · terra">
+<text class="pin" x="176" y="52" text-anchor="end" dominant-baseline="central">GND</text>
+<line class="w" x1="180" y1="52" x2="206" y2="52"/>
+<g class="flag n-gnd"><polygon points="206.0,52.0 213.0,44.0 244.0,44.0 244.0,60.0 213.0,60.0"/><text x="228.5" y="52" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" data-src="OLED · pino VCC" aria-label="VCC · 5 V">
+<text class="pin" x="176" y="72" text-anchor="end" dominant-baseline="central">VCC</text>
+<line class="w" x1="180" y1="72" x2="206" y2="72"/>
+<g class="flag n-vcc"><polygon points="206.0,72.0 213.0,64.0 244.0,64.0 244.0,80.0 213.0,80.0"/><text x="228.5" y="72" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+</g>
+<g class="hit" data-key="SCL" tabindex="0" role="button" data-net="SCL" data-src="OLED · pino SCL" aria-label="SCL · clock I²C">
+<text class="pin" x="176" y="92" text-anchor="end" dominant-baseline="central">SCL</text>
+<line class="w" x1="180" y1="92" x2="206" y2="92"/>
+<g class="flag n-i2c"><polygon points="206.0,92.0 213.0,84.0 244.0,84.0 244.0,100.0 213.0,100.0"/><text x="228.5" y="92" text-anchor="middle" dominant-baseline="central">SCL</text></g>
+</g>
+<g class="hit" data-key="SDA" tabindex="0" role="button" data-net="SDA" data-src="OLED · pino SDA" aria-label="SDA · dados I²C">
+<text class="pin" x="176" y="112" text-anchor="end" dominant-baseline="central">SDA</text>
+<line class="w" x1="180" y1="112" x2="206" y2="112"/>
+<g class="flag n-i2c"><polygon points="206.0,112.0 213.0,104.0 244.0,104.0 244.0,120.0 213.0,120.0"/><text x="228.5" y="112" text-anchor="middle" dominant-baseline="central">SDA</text></g>
+</g>
+<text class="ttl" x="250" y="132" text-anchor="start" dominant-baseline="central">U2 · MCP23017 (DIP-28)</text>
+<text class="sub" x="250" y="148" text-anchor="start" dominant-baseline="central">Endereço 0x20</text>
+<rect class="chip" x="250" y="162" width="160" height="456" rx="4"/>
+<path class="notch" d="M318.0 162 a12 12 0 0 0 24 0"/>
+<g class="hit" data-key="E1B" tabindex="0" role="button" data-net="E1B" data-src="MCP23017 · pino 1 (GPB0)" aria-label="E1B · encoder 1, fase B">
+<rect class="hitpad" x="216" y="187" width="114" height="26"/>
+<text class="pnum" x="258" y="200" text-anchor="start" dominant-baseline="central">1</text>
+<text class="pin" x="278" y="200" text-anchor="start" dominant-baseline="central">GPB0</text>
+<line class="w" x1="216" y1="200" x2="250" y2="200"/>
+<g class="flag n-enc"><polygon points="216.0,200.0 209.0,192.0 178.0,192.0 178.0,208.0 209.0,208.0"/><text x="193.5" y="200" text-anchor="middle" dominant-baseline="central">E1B</text></g>
+</g>
+<g class="hit" data-key="E2B" tabindex="0" role="button" data-net="E2B" data-src="MCP23017 · pino 2 (GPB1)" aria-label="E2B · encoder 2, fase B">
+<rect class="hitpad" x="216" y="217" width="114" height="26"/>
+<text class="pnum" x="258" y="230" text-anchor="start" dominant-baseline="central">2</text>
+<text class="pin" x="278" y="230" text-anchor="start" dominant-baseline="central">GPB1</text>
+<line class="w" x1="216" y1="230" x2="250" y2="230"/>
+<g class="flag n-enc"><polygon points="216.0,230.0 209.0,222.0 178.0,222.0 178.0,238.0 209.0,238.0"/><text x="193.5" y="230" text-anchor="middle" dominant-baseline="central">E2B</text></g>
+</g>
+<g class="hit" data-key="E3B" tabindex="0" role="button" data-net="E3B" data-src="MCP23017 · pino 3 (GPB2)" aria-label="E3B · encoder 3, fase B">
+<rect class="hitpad" x="216" y="247" width="114" height="26"/>
+<text class="pnum" x="258" y="260" text-anchor="start" dominant-baseline="central">3</text>
+<text class="pin" x="278" y="260" text-anchor="start" dominant-baseline="central">GPB2</text>
+<line class="w" x1="216" y1="260" x2="250" y2="260"/>
+<g class="flag n-enc"><polygon points="216.0,260.0 209.0,252.0 178.0,252.0 178.0,268.0 209.0,268.0"/><text x="193.5" y="260" text-anchor="middle" dominant-baseline="central">E3B</text></g>
+</g>
+<g class="hit" data-key="E4B" tabindex="0" role="button" data-net="E4B" data-src="MCP23017 · pino 4 (GPB3)" aria-label="E4B · encoder 4, fase B">
+<rect class="hitpad" x="216" y="277" width="114" height="26"/>
+<text class="pnum" x="258" y="290" text-anchor="start" dominant-baseline="central">4</text>
+<text class="pin" x="278" y="290" text-anchor="start" dominant-baseline="central">GPB3</text>
+<line class="w" x1="216" y1="290" x2="250" y2="290"/>
+<g class="flag n-enc"><polygon points="216.0,290.0 209.0,282.0 178.0,282.0 178.0,298.0 209.0,298.0"/><text x="193.5" y="290" text-anchor="middle" dominant-baseline="central">E4B</text></g>
+</g>
+<g class="hit" data-key="E5B" tabindex="0" role="button" data-net="E5B" data-src="MCP23017 · pino 5 (GPB4)" aria-label="E5B · encoder 5, fase B">
+<rect class="hitpad" x="216" y="307" width="114" height="26"/>
+<text class="pnum" x="258" y="320" text-anchor="start" dominant-baseline="central">5</text>
+<text class="pin" x="278" y="320" text-anchor="start" dominant-baseline="central">GPB4</text>
+<line class="w" x1="216" y1="320" x2="250" y2="320"/>
+<g class="flag n-enc"><polygon points="216.0,320.0 209.0,312.0 178.0,312.0 178.0,328.0 209.0,328.0"/><text x="193.5" y="320" text-anchor="middle" dominant-baseline="central">E5B</text></g>
+</g>
+<g class="hit" data-key="NC_FREE" tabindex="0" role="button" data-net="NC_FREE" data-src="MCP23017 · pino 6 (GPB5)" aria-label="Entrada livre do MCP">
+<rect class="hitpad" x="216" y="337" width="114" height="26"/>
+<text class="pnum" x="258" y="350" text-anchor="start" dominant-baseline="central">6</text>
+<text class="pin dim" x="278" y="350" text-anchor="start" dominant-baseline="central">GPB5</text>
+<line class="w" x1="216" y1="350" x2="250" y2="350"/>
+<path class="w nc" d="M212 346L220 354M212 354L220 346"/>
+</g>
+<g class="hit" data-key="NC_FREE" tabindex="0" role="button" data-net="NC_FREE" data-src="MCP23017 · pino 7 (GPB6)" aria-label="Entrada livre do MCP">
+<rect class="hitpad" x="216" y="367" width="114" height="26"/>
+<text class="pnum" x="258" y="380" text-anchor="start" dominant-baseline="central">7</text>
+<text class="pin dim" x="278" y="380" text-anchor="start" dominant-baseline="central">GPB6</text>
+<line class="w" x1="216" y1="380" x2="250" y2="380"/>
+<path class="w nc" d="M212 376L220 384M212 384L220 376"/>
+</g>
+<g class="hit" data-key="NC_OUT" tabindex="0" role="button" data-net="NC_OUT" data-src="MCP23017 · pino 8 (GPB7)" aria-label="GPA7 / GPB7 · não usar como entrada">
+<rect class="hitpad" x="216" y="397" width="114" height="26"/>
+<text class="pnum" x="258" y="410" text-anchor="start" dominant-baseline="central">8</text>
+<text class="pin dim" x="278" y="410" text-anchor="start" dominant-baseline="central">GPB7</text>
+<line class="w" x1="216" y1="410" x2="250" y2="410"/>
+<path class="w nc" d="M212 406L220 414M212 414L220 406"/>
+</g>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" data-src="MCP23017 · pino 9 (VDD)" aria-label="VCC · 5 V">
+<rect class="hitpad" x="216" y="427" width="114" height="26"/>
+<text class="pnum" x="258" y="440" text-anchor="start" dominant-baseline="central">9</text>
+<text class="pin" x="278" y="440" text-anchor="start" dominant-baseline="central">VDD</text>
+<line class="w" x1="216" y1="440" x2="250" y2="440"/>
+<g class="flag n-vcc"><polygon points="216.0,440.0 209.0,432.0 178.0,432.0 178.0,448.0 209.0,448.0"/><text x="193.5" y="440" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="MCP23017 · pino 10 (VSS)" aria-label="GND · terra">
+<rect class="hitpad" x="216" y="457" width="114" height="26"/>
+<text class="pnum" x="258" y="470" text-anchor="start" dominant-baseline="central">10</text>
+<text class="pin" x="278" y="470" text-anchor="start" dominant-baseline="central">VSS</text>
+<line class="w" x1="216" y1="470" x2="250" y2="470"/>
+<g class="flag n-gnd"><polygon points="216.0,470.0 209.0,462.0 178.0,462.0 178.0,478.0 209.0,478.0"/><text x="193.5" y="470" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="NC_NC" tabindex="0" role="button" data-net="NC_NC" data-src="MCP23017 · pino 11 (NC)" aria-label="NC · sem conexão">
+<rect class="hitpad" x="216" y="487" width="114" height="26"/>
+<text class="pnum" x="258" y="500" text-anchor="start" dominant-baseline="central">11</text>
+<text class="pin dim" x="278" y="500" text-anchor="start" dominant-baseline="central">NC</text>
+<line class="w" x1="216" y1="500" x2="250" y2="500"/>
+<path class="w nc" d="M212 496L220 504M212 504L220 496"/>
+</g>
+<g class="hit" data-key="SCL" tabindex="0" role="button" data-net="SCL" data-src="MCP23017 · pino 12 (SCL)" aria-label="SCL · clock I²C">
+<rect class="hitpad" x="216" y="517" width="114" height="26"/>
+<text class="pnum" x="258" y="530" text-anchor="start" dominant-baseline="central">12</text>
+<text class="pin" x="278" y="530" text-anchor="start" dominant-baseline="central">SCL</text>
+<line class="w" x1="216" y1="530" x2="250" y2="530"/>
+<g class="flag n-i2c"><polygon points="216.0,530.0 209.0,522.0 178.0,522.0 178.0,538.0 209.0,538.0"/><text x="193.5" y="530" text-anchor="middle" dominant-baseline="central">SCL</text></g>
+</g>
+<g class="hit" data-key="SDA" tabindex="0" role="button" data-net="SDA" data-src="MCP23017 · pino 13 (SDA)" aria-label="SDA · dados I²C">
+<rect class="hitpad" x="216" y="547" width="114" height="26"/>
+<text class="pnum" x="258" y="560" text-anchor="start" dominant-baseline="central">13</text>
+<text class="pin" x="278" y="560" text-anchor="start" dominant-baseline="central">SDA</text>
+<line class="w" x1="216" y1="560" x2="250" y2="560"/>
+<g class="flag n-i2c"><polygon points="216.0,560.0 209.0,552.0 178.0,552.0 178.0,568.0 209.0,568.0"/><text x="193.5" y="560" text-anchor="middle" dominant-baseline="central">SDA</text></g>
+</g>
+<g class="hit" data-key="NC_NC" tabindex="0" role="button" data-net="NC_NC" data-src="MCP23017 · pino 14 (NC)" aria-label="NC · sem conexão">
+<rect class="hitpad" x="216" y="577" width="114" height="26"/>
+<text class="pnum" x="258" y="590" text-anchor="start" dominant-baseline="central">14</text>
+<text class="pin dim" x="278" y="590" text-anchor="start" dominant-baseline="central">NC</text>
+<line class="w" x1="216" y1="590" x2="250" y2="590"/>
+<path class="w nc" d="M212 586L220 594M212 594L220 586"/>
+</g>
+<g class="hit" data-key="NC_OUT" tabindex="0" role="button" data-net="NC_OUT" data-src="MCP23017 · pino 28 (GPA7)" aria-label="GPA7 / GPB7 · não usar como entrada">
+<rect class="hitpad" x="330" y="187" width="114" height="26"/>
+<text class="pnum" x="402" y="200" text-anchor="end" dominant-baseline="central">28</text>
+<text class="pin dim" x="382" y="200" text-anchor="end" dominant-baseline="central">GPA7</text>
+<line class="w" x1="410" y1="200" x2="444" y2="200"/>
+<path class="w nc" d="M440 196L448 204M440 204L448 196"/>
+</g>
+<g class="hit" data-key="NC_FREE" tabindex="0" role="button" data-net="NC_FREE" data-src="MCP23017 · pino 27 (GPA6)" aria-label="Entrada livre do MCP">
+<rect class="hitpad" x="330" y="217" width="114" height="26"/>
+<text class="pnum" x="402" y="230" text-anchor="end" dominant-baseline="central">27</text>
+<text class="pin dim" x="382" y="230" text-anchor="end" dominant-baseline="central">GPA6</text>
+<line class="w" x1="410" y1="230" x2="444" y2="230"/>
+<path class="w nc" d="M440 226L448 234M440 234L448 226"/>
+</g>
+<g class="hit" data-key="NC_FREE" tabindex="0" role="button" data-net="NC_FREE" data-src="MCP23017 · pino 26 (GPA5)" aria-label="Entrada livre do MCP">
+<rect class="hitpad" x="330" y="247" width="114" height="26"/>
+<text class="pnum" x="402" y="260" text-anchor="end" dominant-baseline="central">26</text>
+<text class="pin dim" x="382" y="260" text-anchor="end" dominant-baseline="central">GPA5</text>
+<line class="w" x1="410" y1="260" x2="444" y2="260"/>
+<path class="w nc" d="M440 256L448 264M440 264L448 256"/>
+</g>
+<g class="hit" data-key="E5A" tabindex="0" role="button" data-net="E5A" data-src="MCP23017 · pino 25 (GPA4)" aria-label="E5A · encoder 5, fase A">
+<rect class="hitpad" x="330" y="277" width="114" height="26"/>
+<text class="pnum" x="402" y="290" text-anchor="end" dominant-baseline="central">25</text>
+<text class="pin" x="382" y="290" text-anchor="end" dominant-baseline="central">GPA4</text>
+<line class="w" x1="410" y1="290" x2="444" y2="290"/>
+<g class="flag n-enc"><polygon points="444.0,290.0 451.0,282.0 482.0,282.0 482.0,298.0 451.0,298.0"/><text x="466.5" y="290" text-anchor="middle" dominant-baseline="central">E5A</text></g>
+</g>
+<g class="hit" data-key="E4A" tabindex="0" role="button" data-net="E4A" data-src="MCP23017 · pino 24 (GPA3)" aria-label="E4A · encoder 4, fase A">
+<rect class="hitpad" x="330" y="307" width="114" height="26"/>
+<text class="pnum" x="402" y="320" text-anchor="end" dominant-baseline="central">24</text>
+<text class="pin" x="382" y="320" text-anchor="end" dominant-baseline="central">GPA3</text>
+<line class="w" x1="410" y1="320" x2="444" y2="320"/>
+<g class="flag n-enc"><polygon points="444.0,320.0 451.0,312.0 482.0,312.0 482.0,328.0 451.0,328.0"/><text x="466.5" y="320" text-anchor="middle" dominant-baseline="central">E4A</text></g>
+</g>
+<g class="hit" data-key="E3A" tabindex="0" role="button" data-net="E3A" data-src="MCP23017 · pino 23 (GPA2)" aria-label="E3A · encoder 3, fase A">
+<rect class="hitpad" x="330" y="337" width="114" height="26"/>
+<text class="pnum" x="402" y="350" text-anchor="end" dominant-baseline="central">23</text>
+<text class="pin" x="382" y="350" text-anchor="end" dominant-baseline="central">GPA2</text>
+<line class="w" x1="410" y1="350" x2="444" y2="350"/>
+<g class="flag n-enc"><polygon points="444.0,350.0 451.0,342.0 482.0,342.0 482.0,358.0 451.0,358.0"/><text x="466.5" y="350" text-anchor="middle" dominant-baseline="central">E3A</text></g>
+</g>
+<g class="hit" data-key="E2A" tabindex="0" role="button" data-net="E2A" data-src="MCP23017 · pino 22 (GPA1)" aria-label="E2A · encoder 2, fase A">
+<rect class="hitpad" x="330" y="367" width="114" height="26"/>
+<text class="pnum" x="402" y="380" text-anchor="end" dominant-baseline="central">22</text>
+<text class="pin" x="382" y="380" text-anchor="end" dominant-baseline="central">GPA1</text>
+<line class="w" x1="410" y1="380" x2="444" y2="380"/>
+<g class="flag n-enc"><polygon points="444.0,380.0 451.0,372.0 482.0,372.0 482.0,388.0 451.0,388.0"/><text x="466.5" y="380" text-anchor="middle" dominant-baseline="central">E2A</text></g>
+</g>
+<g class="hit" data-key="E1A" tabindex="0" role="button" data-net="E1A" data-src="MCP23017 · pino 21 (GPA0)" aria-label="E1A · encoder 1, fase A">
+<rect class="hitpad" x="330" y="397" width="114" height="26"/>
+<text class="pnum" x="402" y="410" text-anchor="end" dominant-baseline="central">21</text>
+<text class="pin" x="382" y="410" text-anchor="end" dominant-baseline="central">GPA0</text>
+<line class="w" x1="410" y1="410" x2="444" y2="410"/>
+<g class="flag n-enc"><polygon points="444.0,410.0 451.0,402.0 482.0,402.0 482.0,418.0 451.0,418.0"/><text x="466.5" y="410" text-anchor="middle" dominant-baseline="central">E1A</text></g>
+</g>
+<g class="hit" data-key="NC_INT" tabindex="0" role="button" data-net="NC_INT" data-src="MCP23017 · pino 20 (INTA)" aria-label="INTA / INTB · sem uso">
+<rect class="hitpad" x="330" y="427" width="114" height="26"/>
+<text class="pnum" x="402" y="440" text-anchor="end" dominant-baseline="central">20</text>
+<text class="pin dim" x="382" y="440" text-anchor="end" dominant-baseline="central">INTA</text>
+<line class="w" x1="410" y1="440" x2="444" y2="440"/>
+<path class="w nc" d="M440 436L448 444M440 444L448 436"/>
+</g>
+<g class="hit" data-key="NC_INT" tabindex="0" role="button" data-net="NC_INT" data-src="MCP23017 · pino 19 (INTB)" aria-label="INTA / INTB · sem uso">
+<rect class="hitpad" x="330" y="457" width="114" height="26"/>
+<text class="pnum" x="402" y="470" text-anchor="end" dominant-baseline="central">19</text>
+<text class="pin dim" x="382" y="470" text-anchor="end" dominant-baseline="central">INTB</text>
+<line class="w" x1="410" y1="470" x2="444" y2="470"/>
+<path class="w nc" d="M440 466L448 474M440 474L448 466"/>
+</g>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" data-src="MCP23017 · pino 18 (RESET)" aria-label="VCC · 5 V">
+<rect class="hitpad" x="330" y="487" width="114" height="26"/>
+<text class="pnum" x="402" y="500" text-anchor="end" dominant-baseline="central">18</text>
+<text class="pin" x="382" y="500" text-anchor="end" dominant-baseline="central">RESET</text>
+<line class="w" x1="410" y1="500" x2="444" y2="500"/>
+<g class="flag n-vcc"><polygon points="444.0,500.0 451.0,492.0 482.0,492.0 482.0,508.0 451.0,508.0"/><text x="466.5" y="500" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="MCP23017 · pino 17 (A2)" aria-label="GND · terra">
+<rect class="hitpad" x="330" y="517" width="114" height="26"/>
+<text class="pnum" x="402" y="530" text-anchor="end" dominant-baseline="central">17</text>
+<text class="pin" x="382" y="530" text-anchor="end" dominant-baseline="central">A2</text>
+<line class="w" x1="410" y1="530" x2="444" y2="530"/>
+<g class="flag n-gnd"><polygon points="444.0,530.0 451.0,522.0 482.0,522.0 482.0,538.0 451.0,538.0"/><text x="466.5" y="530" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="MCP23017 · pino 16 (A1)" aria-label="GND · terra">
+<rect class="hitpad" x="330" y="547" width="114" height="26"/>
+<text class="pnum" x="402" y="560" text-anchor="end" dominant-baseline="central">16</text>
+<text class="pin" x="382" y="560" text-anchor="end" dominant-baseline="central">A1</text>
+<line class="w" x1="410" y1="560" x2="444" y2="560"/>
+<g class="flag n-gnd"><polygon points="444.0,560.0 451.0,552.0 482.0,552.0 482.0,568.0 451.0,568.0"/><text x="466.5" y="560" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="MCP23017 · pino 15 (A0)" aria-label="GND · terra">
+<rect class="hitpad" x="330" y="577" width="114" height="26"/>
+<text class="pnum" x="402" y="590" text-anchor="end" dominant-baseline="central">15</text>
+<text class="pin" x="382" y="590" text-anchor="end" dominant-baseline="central">A0</text>
+<line class="w" x1="410" y1="590" x2="444" y2="590"/>
+<g class="flag n-gnd"><polygon points="444.0,590.0 451.0,582.0 482.0,582.0 482.0,598.0 451.0,598.0"/><text x="466.5" y="590" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<text class="ttl" x="660" y="108" text-anchor="start" dominant-baseline="central">U1 · Arduino Pro Micro</text>
+<text class="sub" x="660" y="124" text-anchor="start" dominant-baseline="central">ATmega32U4 · 5 V</text>
+<rect class="usb" x="715.0" y="138" width="60" height="22" rx="3"/>
+<text class="pnum" x="745.0" y="149" text-anchor="middle" dominant-baseline="central">USB</text>
+<rect class="chip" x="660" y="160" width="170" height="462" rx="6"/>
+<g class="hit" data-key="LIN2" tabindex="0" role="button" data-net="LIN2" data-src="Pro Micro · TX0 · 1" aria-label="LIN2 · linha 2 da matriz">
+<rect class="hitpad" x="620" y="189" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="204" r="4"/>
+<text class="pin" x="680" y="204" text-anchor="start" dominant-baseline="central">TX0 · 1</text>
+<line class="w" x1="620" y1="204" x2="660" y2="204"/>
+<g class="flag n-row"><polygon points="620.0,204.0 613.0,196.0 574.0,196.0 574.0,212.0 613.0,212.0"/><text x="593.5" y="204" text-anchor="middle" dominant-baseline="central">LIN2</text></g>
+</g>
+<g class="hit" data-key="LIN1" tabindex="0" role="button" data-net="LIN1" data-src="Pro Micro · RX1 · 0" aria-label="LIN1 · linha 1 da matriz">
+<rect class="hitpad" x="620" y="223" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="238" r="4"/>
+<text class="pin" x="680" y="238" text-anchor="start" dominant-baseline="central">RX1 · 0</text>
+<line class="w" x1="620" y1="238" x2="660" y2="238"/>
+<g class="flag n-row"><polygon points="620.0,238.0 613.0,230.0 574.0,230.0 574.0,246.0 613.0,246.0"/><text x="593.5" y="238" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Pro Micro · GND" aria-label="GND · terra">
+<rect class="hitpad" x="620" y="257" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="272" r="4"/>
+<text class="pin" x="680" y="272" text-anchor="start" dominant-baseline="central">GND</text>
+<line class="w" x1="620" y1="272" x2="660" y2="272"/>
+<g class="flag n-gnd"><polygon points="620.0,272.0 613.0,264.0 582.0,264.0 582.0,280.0 613.0,280.0"/><text x="597.5" y="272" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Pro Micro · GND" aria-label="GND · terra">
+<rect class="hitpad" x="620" y="291" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="306" r="4"/>
+<text class="pin" x="680" y="306" text-anchor="start" dominant-baseline="central">GND</text>
+<line class="w" x1="620" y1="306" x2="660" y2="306"/>
+<g class="flag n-gnd"><polygon points="620.0,306.0 613.0,298.0 582.0,298.0 582.0,314.0 613.0,314.0"/><text x="597.5" y="306" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="SDA" tabindex="0" role="button" data-net="SDA" data-src="Pro Micro · 2 · SDA" aria-label="SDA · dados I²C">
+<rect class="hitpad" x="620" y="325" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="340" r="4"/>
+<text class="pin" x="680" y="340" text-anchor="start" dominant-baseline="central">2 · SDA</text>
+<line class="w" x1="620" y1="340" x2="660" y2="340"/>
+<g class="flag n-i2c"><polygon points="620.0,340.0 613.0,332.0 582.0,332.0 582.0,348.0 613.0,348.0"/><text x="597.5" y="340" text-anchor="middle" dominant-baseline="central">SDA</text></g>
+</g>
+<g class="hit" data-key="SCL" tabindex="0" role="button" data-net="SCL" data-src="Pro Micro · 3 · SCL" aria-label="SCL · clock I²C">
+<rect class="hitpad" x="620" y="359" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="374" r="4"/>
+<text class="pin" x="680" y="374" text-anchor="start" dominant-baseline="central">3 · SCL</text>
+<line class="w" x1="620" y1="374" x2="660" y2="374"/>
+<g class="flag n-i2c"><polygon points="620.0,374.0 613.0,366.0 582.0,366.0 582.0,382.0 613.0,382.0"/><text x="597.5" y="374" text-anchor="middle" dominant-baseline="central">SCL</text></g>
+</g>
+<g class="hit" data-key="LIN3" tabindex="0" role="button" data-net="LIN3" data-src="Pro Micro · 4" aria-label="LIN3 · linha 3 da matriz">
+<rect class="hitpad" x="620" y="393" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="408" r="4"/>
+<text class="pin" x="680" y="408" text-anchor="start" dominant-baseline="central">4</text>
+<line class="w" x1="620" y1="408" x2="660" y2="408"/>
+<g class="flag n-row"><polygon points="620.0,408.0 613.0,400.0 574.0,400.0 574.0,416.0 613.0,416.0"/><text x="593.5" y="408" text-anchor="middle" dominant-baseline="central">LIN3</text></g>
+</g>
+<g class="hit" data-key="LIN4" tabindex="0" role="button" data-net="LIN4" data-src="Pro Micro · 5" aria-label="LIN4 · linha 4 da matriz">
+<rect class="hitpad" x="620" y="427" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="442" r="4"/>
+<text class="pin" x="680" y="442" text-anchor="start" dominant-baseline="central">5</text>
+<line class="w" x1="620" y1="442" x2="660" y2="442"/>
+<g class="flag n-row"><polygon points="620.0,442.0 613.0,434.0 574.0,434.0 574.0,450.0 613.0,450.0"/><text x="593.5" y="442" text-anchor="middle" dominant-baseline="central">LIN4</text></g>
+</g>
+<g class="hit" data-key="LIN5" tabindex="0" role="button" data-net="LIN5" data-src="Pro Micro · 6" aria-label="LIN5 · linha 5 da matriz">
+<rect class="hitpad" x="620" y="461" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="476" r="4"/>
+<text class="pin" x="680" y="476" text-anchor="start" dominant-baseline="central">6</text>
+<line class="w" x1="620" y1="476" x2="660" y2="476"/>
+<g class="flag n-row"><polygon points="620.0,476.0 613.0,468.0 574.0,468.0 574.0,484.0 613.0,484.0"/><text x="593.5" y="476" text-anchor="middle" dominant-baseline="central">LIN5</text></g>
+</g>
+<g class="hit" data-key="LIN6" tabindex="0" role="button" data-net="LIN6" data-src="Pro Micro · 7" aria-label="LIN6 · linha 6 da matriz">
+<rect class="hitpad" x="620" y="495" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="510" r="4"/>
+<text class="pin" x="680" y="510" text-anchor="start" dominant-baseline="central">7</text>
+<line class="w" x1="620" y1="510" x2="660" y2="510"/>
+<g class="flag n-row"><polygon points="620.0,510.0 613.0,502.0 574.0,502.0 574.0,518.0 613.0,518.0"/><text x="593.5" y="510" text-anchor="middle" dominant-baseline="central">LIN6</text></g>
+</g>
+<g class="hit" data-key="LIN7" tabindex="0" role="button" data-net="LIN7" data-src="Pro Micro · 8" aria-label="LIN7 · linha 7 da matriz">
+<rect class="hitpad" x="620" y="529" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="544" r="4"/>
+<text class="pin" x="680" y="544" text-anchor="start" dominant-baseline="central">8</text>
+<line class="w" x1="620" y1="544" x2="660" y2="544"/>
+<g class="flag n-row"><polygon points="620.0,544.0 613.0,536.0 574.0,536.0 574.0,552.0 613.0,552.0"/><text x="593.5" y="544" text-anchor="middle" dominant-baseline="central">LIN7</text></g>
+</g>
+<g class="hit" data-key="COL1" tabindex="0" role="button" data-net="COL1" data-src="Pro Micro · 9" aria-label="COL1 · coluna 1 da matriz">
+<rect class="hitpad" x="620" y="563" width="120" height="30"/>
+<circle class="ppad" cx="670" cy="578" r="4"/>
+<text class="pin" x="680" y="578" text-anchor="start" dominant-baseline="central">9</text>
+<line class="w" x1="620" y1="578" x2="660" y2="578"/>
+<g class="flag n-col"><polygon points="620.0,578.0 613.0,570.0 574.0,570.0 574.0,586.0 613.0,586.0"/><text x="593.5" y="578" text-anchor="middle" dominant-baseline="central">COL1</text></g>
+</g>
+<g class="hit" data-key="NC_RAW" tabindex="0" role="button" data-net="NC_RAW" data-src="Pro Micro · RAW" aria-label="RAW · sem uso">
+<rect class="hitpad" x="750" y="189" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="204" r="4"/>
+<text class="pin dim" x="810" y="204" text-anchor="end" dominant-baseline="central">RAW</text>
+<line class="w" x1="830" y1="204" x2="870" y2="204"/>
+<path class="w nc" d="M866 200L874 208M866 208L874 200"/>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Pro Micro · GND" aria-label="GND · terra">
+<rect class="hitpad" x="750" y="223" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="238" r="4"/>
+<text class="pin" x="810" y="238" text-anchor="end" dominant-baseline="central">GND</text>
+<line class="w" x1="830" y1="238" x2="870" y2="238"/>
+<g class="flag n-gnd"><polygon points="870.0,238.0 877.0,230.0 908.0,230.0 908.0,246.0 877.0,246.0"/><text x="892.5" y="238" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="NC_RST" tabindex="0" role="button" data-net="NC_RST" data-src="Pro Micro · RST" aria-label="RST · sem uso">
+<rect class="hitpad" x="750" y="257" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="272" r="4"/>
+<text class="pin dim" x="810" y="272" text-anchor="end" dominant-baseline="central">RST</text>
+<line class="w" x1="830" y1="272" x2="870" y2="272"/>
+<path class="w nc" d="M866 268L874 276M866 276L874 268"/>
+</g>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" data-src="Pro Micro · VCC" aria-label="VCC · 5 V">
+<rect class="hitpad" x="750" y="291" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="306" r="4"/>
+<text class="pin" x="810" y="306" text-anchor="end" dominant-baseline="central">VCC</text>
+<line class="w" x1="830" y1="306" x2="870" y2="306"/>
+<g class="flag n-vcc"><polygon points="870.0,306.0 877.0,298.0 908.0,298.0 908.0,314.0 877.0,314.0"/><text x="892.5" y="306" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+</g>
+<g class="hit" data-key="FD4" tabindex="0" role="button" data-net="FD4" data-src="Pro Micro · A3 · 21" aria-label="FD4 · fader 4">
+<rect class="hitpad" x="750" y="325" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="340" r="4"/>
+<text class="pin" x="810" y="340" text-anchor="end" dominant-baseline="central">A3 · 21</text>
+<line class="w" x1="830" y1="340" x2="870" y2="340"/>
+<g class="flag n-ana"><polygon points="870.0,340.0 877.0,332.0 908.0,332.0 908.0,348.0 877.0,348.0"/><text x="892.5" y="340" text-anchor="middle" dominant-baseline="central">FD4</text></g>
+</g>
+<g class="hit" data-key="FD3" tabindex="0" role="button" data-net="FD3" data-src="Pro Micro · A2 · 20" aria-label="FD3 · fader 3">
+<rect class="hitpad" x="750" y="359" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="374" r="4"/>
+<text class="pin" x="810" y="374" text-anchor="end" dominant-baseline="central">A2 · 20</text>
+<line class="w" x1="830" y1="374" x2="870" y2="374"/>
+<g class="flag n-ana"><polygon points="870.0,374.0 877.0,366.0 908.0,366.0 908.0,382.0 877.0,382.0"/><text x="892.5" y="374" text-anchor="middle" dominant-baseline="central">FD3</text></g>
+</g>
+<g class="hit" data-key="FD2" tabindex="0" role="button" data-net="FD2" data-src="Pro Micro · A1 · 19" aria-label="FD2 · fader 2">
+<rect class="hitpad" x="750" y="393" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="408" r="4"/>
+<text class="pin" x="810" y="408" text-anchor="end" dominant-baseline="central">A1 · 19</text>
+<line class="w" x1="830" y1="408" x2="870" y2="408"/>
+<g class="flag n-ana"><polygon points="870.0,408.0 877.0,400.0 908.0,400.0 908.0,416.0 877.0,416.0"/><text x="892.5" y="408" text-anchor="middle" dominant-baseline="central">FD2</text></g>
+</g>
+<g class="hit" data-key="FD1" tabindex="0" role="button" data-net="FD1" data-src="Pro Micro · A0 · 18" aria-label="FD1 · fader 1">
+<rect class="hitpad" x="750" y="427" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="442" r="4"/>
+<text class="pin" x="810" y="442" text-anchor="end" dominant-baseline="central">A0 · 18</text>
+<line class="w" x1="830" y1="442" x2="870" y2="442"/>
+<g class="flag n-ana"><polygon points="870.0,442.0 877.0,434.0 908.0,434.0 908.0,450.0 877.0,450.0"/><text x="892.5" y="442" text-anchor="middle" dominant-baseline="central">FD1</text></g>
+</g>
+<g class="hit" data-key="COL4" tabindex="0" role="button" data-net="COL4" data-src="Pro Micro · 15" aria-label="COL4 · coluna 4 da matriz">
+<rect class="hitpad" x="750" y="461" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="476" r="4"/>
+<text class="pin" x="810" y="476" text-anchor="end" dominant-baseline="central">15</text>
+<line class="w" x1="830" y1="476" x2="870" y2="476"/>
+<g class="flag n-col"><polygon points="870.0,476.0 877.0,468.0 916.0,468.0 916.0,484.0 877.0,484.0"/><text x="896.5" y="476" text-anchor="middle" dominant-baseline="central">COL4</text></g>
+</g>
+<g class="hit" data-key="COL3" tabindex="0" role="button" data-net="COL3" data-src="Pro Micro · 14" aria-label="COL3 · coluna 3 da matriz">
+<rect class="hitpad" x="750" y="495" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="510" r="4"/>
+<text class="pin" x="810" y="510" text-anchor="end" dominant-baseline="central">14</text>
+<line class="w" x1="830" y1="510" x2="870" y2="510"/>
+<g class="flag n-col"><polygon points="870.0,510.0 877.0,502.0 916.0,502.0 916.0,518.0 877.0,518.0"/><text x="896.5" y="510" text-anchor="middle" dominant-baseline="central">COL3</text></g>
+</g>
+<g class="hit" data-key="COL5" tabindex="0" role="button" data-net="COL5" data-src="Pro Micro · 16" aria-label="COL5 · coluna 5 da matriz">
+<rect class="hitpad" x="750" y="529" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="544" r="4"/>
+<text class="pin" x="810" y="544" text-anchor="end" dominant-baseline="central">16</text>
+<line class="w" x1="830" y1="544" x2="870" y2="544"/>
+<g class="flag n-col"><polygon points="870.0,544.0 877.0,536.0 916.0,536.0 916.0,552.0 877.0,552.0"/><text x="896.5" y="544" text-anchor="middle" dominant-baseline="central">COL5</text></g>
+</g>
+<g class="hit" data-key="COL2" tabindex="0" role="button" data-net="COL2" data-src="Pro Micro · 10" aria-label="COL2 · coluna 2 da matriz">
+<rect class="hitpad" x="750" y="563" width="120" height="30"/>
+<circle class="ppad" cx="820" cy="578" r="4"/>
+<text class="pin" x="810" y="578" text-anchor="end" dominant-baseline="central">10</text>
+<line class="w" x1="830" y1="578" x2="870" y2="578"/>
+<g class="flag n-col"><polygon points="870.0,578.0 877.0,570.0 916.0,570.0 916.0,586.0 877.0,586.0"/><text x="896.5" y="578" text-anchor="middle" dominant-baseline="central">COL2</text></g>
+</g>
+<text class="ttl" x="960" y="168" text-anchor="start" dominant-baseline="central">Faders 10 kΩ lineares</text>
+<text class="sub" x="960" y="184" text-anchor="start" dominant-baseline="central">Clique num fader para ver as ligações</text>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" data-src="Fader 1 · ponta de cima" aria-label="VCC · 5 V">
+<g class="flag n-vcc"><polygon points="1000.0,222.0 981.0,215.0 981.0,199.0 1019.0,199.0 1019.0,215.0"/><text x="1000.0" y="207" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="1000" y1="222" x2="1000" y2="262"/>
+</g>
+<g class="hit" data-key="FAD1" tabindex="0" role="button" data-comp="FAD1" aria-label="Fader 1">
+<rect class="hitpad" x="978" y="258" width="44" height="200"/>
+<rect class="part" x="993" y="262" width="14" height="190" rx="2"/>
+<text class="lbl" x="1000" y="530" text-anchor="middle" dominant-baseline="central">Fader 1</text>
+<text class="sub" x="1000" y="546" text-anchor="middle" dominant-baseline="central">A0 · CC 30</text>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Fader 1 · ponta de baixo" aria-label="GND · terra">
+<line class="w" x1="1000" y1="452" x2="1000" y2="492"/>
+<path class="w" d="M988 492H1012M992 498H1008M996 504H1004"/>
+</g>
+<g class="hit" data-key="FD1" tabindex="0" role="button" data-net="FD1" data-src="Fader 1 · cursor" aria-label="FD1 · fader 1">
+<polyline class="w" points="1034,357 1014,357"/>
+<polygon class="arrowhead" points="1009,357 1016,352 1016,362"/>
+<g class="flag n-ana"><polygon points="1034.0,357.0 1041.0,349.0 1072.0,349.0 1072.0,365.0 1041.0,365.0"/><text x="1056.5" y="357" text-anchor="middle" dominant-baseline="central">FD1</text></g>
+</g>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" data-src="Fader 2 · ponta de cima" aria-label="VCC · 5 V">
+<g class="flag n-vcc"><polygon points="1092.0,222.0 1073.0,215.0 1073.0,199.0 1111.0,199.0 1111.0,215.0"/><text x="1092.0" y="207" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="1092" y1="222" x2="1092" y2="262"/>
+</g>
+<g class="hit" data-key="FAD2" tabindex="0" role="button" data-comp="FAD2" aria-label="Fader 2">
+<rect class="hitpad" x="1070" y="258" width="44" height="200"/>
+<rect class="part" x="1085" y="262" width="14" height="190" rx="2"/>
+<text class="lbl" x="1092" y="530" text-anchor="middle" dominant-baseline="central">Fader 2</text>
+<text class="sub" x="1092" y="546" text-anchor="middle" dominant-baseline="central">A1 · CC 31</text>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Fader 2 · ponta de baixo" aria-label="GND · terra">
+<line class="w" x1="1092" y1="452" x2="1092" y2="492"/>
+<path class="w" d="M1080 492H1104M1084 498H1100M1088 504H1096"/>
+</g>
+<g class="hit" data-key="FD2" tabindex="0" role="button" data-net="FD2" data-src="Fader 2 · cursor" aria-label="FD2 · fader 2">
+<polyline class="w" points="1126,357 1106,357"/>
+<polygon class="arrowhead" points="1101,357 1108,352 1108,362"/>
+<g class="flag n-ana"><polygon points="1126.0,357.0 1133.0,349.0 1164.0,349.0 1164.0,365.0 1133.0,365.0"/><text x="1148.5" y="357" text-anchor="middle" dominant-baseline="central">FD2</text></g>
+</g>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" data-src="Fader 3 · ponta de cima" aria-label="VCC · 5 V">
+<g class="flag n-vcc"><polygon points="1184.0,222.0 1165.0,215.0 1165.0,199.0 1203.0,199.0 1203.0,215.0"/><text x="1184.0" y="207" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="1184" y1="222" x2="1184" y2="262"/>
+</g>
+<g class="hit" data-key="FAD3" tabindex="0" role="button" data-comp="FAD3" aria-label="Fader 3">
+<rect class="hitpad" x="1162" y="258" width="44" height="200"/>
+<rect class="part" x="1177" y="262" width="14" height="190" rx="2"/>
+<text class="lbl" x="1184" y="530" text-anchor="middle" dominant-baseline="central">Fader 3</text>
+<text class="sub" x="1184" y="546" text-anchor="middle" dominant-baseline="central">A2 · CC 32</text>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Fader 3 · ponta de baixo" aria-label="GND · terra">
+<line class="w" x1="1184" y1="452" x2="1184" y2="492"/>
+<path class="w" d="M1172 492H1196M1176 498H1192M1180 504H1188"/>
+</g>
+<g class="hit" data-key="FD3" tabindex="0" role="button" data-net="FD3" data-src="Fader 3 · cursor" aria-label="FD3 · fader 3">
+<polyline class="w" points="1218,357 1198,357"/>
+<polygon class="arrowhead" points="1193,357 1200,352 1200,362"/>
+<g class="flag n-ana"><polygon points="1218.0,357.0 1225.0,349.0 1256.0,349.0 1256.0,365.0 1225.0,365.0"/><text x="1240.5" y="357" text-anchor="middle" dominant-baseline="central">FD3</text></g>
+</g>
+<g class="hit" data-key="VCC" tabindex="0" role="button" data-net="VCC" data-src="Fader 4 · ponta de cima" aria-label="VCC · 5 V">
+<g class="flag n-vcc"><polygon points="1276.0,222.0 1257.0,215.0 1257.0,199.0 1295.0,199.0 1295.0,215.0"/><text x="1276.0" y="207" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="1276" y1="222" x2="1276" y2="262"/>
+</g>
+<g class="hit" data-key="FAD4" tabindex="0" role="button" data-comp="FAD4" aria-label="Fader 4">
+<rect class="hitpad" x="1254" y="258" width="44" height="200"/>
+<rect class="part" x="1269" y="262" width="14" height="190" rx="2"/>
+<text class="lbl" x="1276" y="530" text-anchor="middle" dominant-baseline="central">Fader 4</text>
+<text class="sub" x="1276" y="546" text-anchor="middle" dominant-baseline="central">A3 · CC 33</text>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Fader 4 · ponta de baixo" aria-label="GND · terra">
+<line class="w" x1="1276" y1="452" x2="1276" y2="492"/>
+<path class="w" d="M1264 492H1288M1268 498H1284M1272 504H1280"/>
+</g>
+<g class="hit" data-key="FD4" tabindex="0" role="button" data-net="FD4" data-src="Fader 4 · cursor" aria-label="FD4 · fader 4">
+<polyline class="w" points="1310,357 1290,357"/>
+<polygon class="arrowhead" points="1285,357 1292,352 1292,362"/>
+<g class="flag n-ana"><polygon points="1310.0,357.0 1317.0,349.0 1348.0,349.0 1348.0,365.0 1317.0,365.0"/><text x="1332.5" y="357" text-anchor="middle" dominant-baseline="central">FD4</text></g>
+</g>
+<text class="ttl" x="140" y="652" text-anchor="start" dominant-baseline="central">Encoders EC11 com botão</text>
+<text class="sub" x="140" y="668" text-anchor="start" dominant-baseline="central">A, B no MCP · C no GND · botão na matriz (linha 1)</text>
+<g class="hit" data-key="ENC1" tabindex="0" role="button" data-comp="ENC1" aria-label="Encoder 1">
+<rect class="chip" x="230" y="694" width="92" height="64" rx="6"/>
+<circle class="knob" cx="296" cy="726" r="14"/>
+<text class="lbl" x="258" y="718" text-anchor="middle" dominant-baseline="central">E1</text>
+<text class="sub" x="258" y="735" text-anchor="middle" dominant-baseline="central">CC 21</text>
+</g>
+<g class="hit" data-key="E1A" tabindex="0" role="button" data-net="E1A" data-src="Encoder 1 · pino A" aria-label="E1A · encoder 1, fase A">
+<text class="pnum" x="236" y="708" text-anchor="start" dominant-baseline="central">A</text>
+<line class="w" x1="200" y1="708" x2="230" y2="708"/>
+<g class="flag n-enc"><polygon points="200.0,708.0 193.0,700.0 162.0,700.0 162.0,716.0 193.0,716.0"/><text x="177.5" y="708" text-anchor="middle" dominant-baseline="central">E1A</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Encoder 1 · pino C" aria-label="GND · terra">
+<text class="pnum" x="236" y="726" text-anchor="start" dominant-baseline="central">C</text>
+<line class="w" x1="200" y1="726" x2="230" y2="726"/>
+<g class="flag n-gnd"><polygon points="200.0,726.0 193.0,718.0 162.0,718.0 162.0,734.0 193.0,734.0"/><text x="177.5" y="726" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="E1B" tabindex="0" role="button" data-net="E1B" data-src="Encoder 1 · pino B" aria-label="E1B · encoder 1, fase B">
+<text class="pnum" x="236" y="744" text-anchor="start" dominant-baseline="central">B</text>
+<line class="w" x1="200" y1="744" x2="230" y2="744"/>
+<g class="flag n-enc"><polygon points="200.0,744.0 193.0,736.0 162.0,736.0 162.0,752.0 193.0,752.0"/><text x="177.5" y="744" text-anchor="middle" dominant-baseline="central">E1B</text></g>
+</g>
+<g class="hit" data-key="BTN1" tabindex="0" role="button" data-net="LIN1" data-comp="BTN1" data-src="Encoder 1 · botão (SW)" aria-label="Botão do encoder 1 · nota 1">
+<text class="pnum" x="316" y="715" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="715" x2="327" y2="715"/>
+<polygon class="dio" points="327,709 327,721 357,715"/>
+<line class="w bar" x1="357" y1="709" x2="357" y2="721"/>
+<line class="w" x1="357" y1="715" x2="362" y2="715"/>
+<line class="w" x1="362" y1="715" x2="378" y2="715"/>
+<g class="flag n-row"><polygon points="378.0,715.0 385.0,707.0 424.0,707.0 424.0,723.0 385.0,723.0"/><text x="404.5" y="715" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+</g>
+<g class="hit" data-key="COL1" tabindex="0" role="button" data-net="COL1" data-src="Encoder 1 · botão (SW)" aria-label="COL1 · coluna 1 da matriz">
+<text class="pnum" x="316" y="737" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="737" x2="378" y2="737"/>
+<g class="flag n-col"><polygon points="378.0,737.0 385.0,729.0 424.0,729.0 424.0,745.0 385.0,745.0"/><text x="404.5" y="737" text-anchor="middle" dominant-baseline="central">COL1</text></g>
+</g>
+<g class="hit" data-key="ENC2" tabindex="0" role="button" data-comp="ENC2" aria-label="Encoder 2">
+<rect class="chip" x="230" y="778" width="92" height="64" rx="6"/>
+<circle class="knob" cx="296" cy="810" r="14"/>
+<text class="lbl" x="258" y="802" text-anchor="middle" dominant-baseline="central">E2</text>
+<text class="sub" x="258" y="819" text-anchor="middle" dominant-baseline="central">CC 22</text>
+</g>
+<g class="hit" data-key="E2A" tabindex="0" role="button" data-net="E2A" data-src="Encoder 2 · pino A" aria-label="E2A · encoder 2, fase A">
+<text class="pnum" x="236" y="792" text-anchor="start" dominant-baseline="central">A</text>
+<line class="w" x1="200" y1="792" x2="230" y2="792"/>
+<g class="flag n-enc"><polygon points="200.0,792.0 193.0,784.0 162.0,784.0 162.0,800.0 193.0,800.0"/><text x="177.5" y="792" text-anchor="middle" dominant-baseline="central">E2A</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Encoder 2 · pino C" aria-label="GND · terra">
+<text class="pnum" x="236" y="810" text-anchor="start" dominant-baseline="central">C</text>
+<line class="w" x1="200" y1="810" x2="230" y2="810"/>
+<g class="flag n-gnd"><polygon points="200.0,810.0 193.0,802.0 162.0,802.0 162.0,818.0 193.0,818.0"/><text x="177.5" y="810" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="E2B" tabindex="0" role="button" data-net="E2B" data-src="Encoder 2 · pino B" aria-label="E2B · encoder 2, fase B">
+<text class="pnum" x="236" y="828" text-anchor="start" dominant-baseline="central">B</text>
+<line class="w" x1="200" y1="828" x2="230" y2="828"/>
+<g class="flag n-enc"><polygon points="200.0,828.0 193.0,820.0 162.0,820.0 162.0,836.0 193.0,836.0"/><text x="177.5" y="828" text-anchor="middle" dominant-baseline="central">E2B</text></g>
+</g>
+<g class="hit" data-key="BTN2" tabindex="0" role="button" data-net="LIN1" data-comp="BTN2" data-src="Encoder 2 · botão (SW)" aria-label="Botão do encoder 2 · nota 2">
+<text class="pnum" x="316" y="799" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="799" x2="327" y2="799"/>
+<polygon class="dio" points="327,793 327,805 357,799"/>
+<line class="w bar" x1="357" y1="793" x2="357" y2="805"/>
+<line class="w" x1="357" y1="799" x2="362" y2="799"/>
+<line class="w" x1="362" y1="799" x2="378" y2="799"/>
+<g class="flag n-row"><polygon points="378.0,799.0 385.0,791.0 424.0,791.0 424.0,807.0 385.0,807.0"/><text x="404.5" y="799" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+</g>
+<g class="hit" data-key="COL2" tabindex="0" role="button" data-net="COL2" data-src="Encoder 2 · botão (SW)" aria-label="COL2 · coluna 2 da matriz">
+<text class="pnum" x="316" y="821" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="821" x2="378" y2="821"/>
+<g class="flag n-col"><polygon points="378.0,821.0 385.0,813.0 424.0,813.0 424.0,829.0 385.0,829.0"/><text x="404.5" y="821" text-anchor="middle" dominant-baseline="central">COL2</text></g>
+</g>
+<g class="hit" data-key="ENC3" tabindex="0" role="button" data-comp="ENC3" aria-label="Encoder 3">
+<rect class="chip" x="230" y="862" width="92" height="64" rx="6"/>
+<circle class="knob" cx="296" cy="894" r="14"/>
+<text class="lbl" x="258" y="886" text-anchor="middle" dominant-baseline="central">E3</text>
+<text class="sub" x="258" y="903" text-anchor="middle" dominant-baseline="central">CC 23</text>
+</g>
+<g class="hit" data-key="E3A" tabindex="0" role="button" data-net="E3A" data-src="Encoder 3 · pino A" aria-label="E3A · encoder 3, fase A">
+<text class="pnum" x="236" y="876" text-anchor="start" dominant-baseline="central">A</text>
+<line class="w" x1="200" y1="876" x2="230" y2="876"/>
+<g class="flag n-enc"><polygon points="200.0,876.0 193.0,868.0 162.0,868.0 162.0,884.0 193.0,884.0"/><text x="177.5" y="876" text-anchor="middle" dominant-baseline="central">E3A</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Encoder 3 · pino C" aria-label="GND · terra">
+<text class="pnum" x="236" y="894" text-anchor="start" dominant-baseline="central">C</text>
+<line class="w" x1="200" y1="894" x2="230" y2="894"/>
+<g class="flag n-gnd"><polygon points="200.0,894.0 193.0,886.0 162.0,886.0 162.0,902.0 193.0,902.0"/><text x="177.5" y="894" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="E3B" tabindex="0" role="button" data-net="E3B" data-src="Encoder 3 · pino B" aria-label="E3B · encoder 3, fase B">
+<text class="pnum" x="236" y="912" text-anchor="start" dominant-baseline="central">B</text>
+<line class="w" x1="200" y1="912" x2="230" y2="912"/>
+<g class="flag n-enc"><polygon points="200.0,912.0 193.0,904.0 162.0,904.0 162.0,920.0 193.0,920.0"/><text x="177.5" y="912" text-anchor="middle" dominant-baseline="central">E3B</text></g>
+</g>
+<g class="hit" data-key="BTN3" tabindex="0" role="button" data-net="LIN1" data-comp="BTN3" data-src="Encoder 3 · botão (SW)" aria-label="Botão do encoder 3 · nota 3">
+<text class="pnum" x="316" y="883" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="883" x2="327" y2="883"/>
+<polygon class="dio" points="327,877 327,889 357,883"/>
+<line class="w bar" x1="357" y1="877" x2="357" y2="889"/>
+<line class="w" x1="357" y1="883" x2="362" y2="883"/>
+<line class="w" x1="362" y1="883" x2="378" y2="883"/>
+<g class="flag n-row"><polygon points="378.0,883.0 385.0,875.0 424.0,875.0 424.0,891.0 385.0,891.0"/><text x="404.5" y="883" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+</g>
+<g class="hit" data-key="COL3" tabindex="0" role="button" data-net="COL3" data-src="Encoder 3 · botão (SW)" aria-label="COL3 · coluna 3 da matriz">
+<text class="pnum" x="316" y="905" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="905" x2="378" y2="905"/>
+<g class="flag n-col"><polygon points="378.0,905.0 385.0,897.0 424.0,897.0 424.0,913.0 385.0,913.0"/><text x="404.5" y="905" text-anchor="middle" dominant-baseline="central">COL3</text></g>
+</g>
+<g class="hit" data-key="ENC4" tabindex="0" role="button" data-comp="ENC4" aria-label="Encoder 4">
+<rect class="chip" x="230" y="946" width="92" height="64" rx="6"/>
+<circle class="knob" cx="296" cy="978" r="14"/>
+<text class="lbl" x="258" y="970" text-anchor="middle" dominant-baseline="central">E4</text>
+<text class="sub" x="258" y="987" text-anchor="middle" dominant-baseline="central">CC 24</text>
+</g>
+<g class="hit" data-key="E4A" tabindex="0" role="button" data-net="E4A" data-src="Encoder 4 · pino A" aria-label="E4A · encoder 4, fase A">
+<text class="pnum" x="236" y="960" text-anchor="start" dominant-baseline="central">A</text>
+<line class="w" x1="200" y1="960" x2="230" y2="960"/>
+<g class="flag n-enc"><polygon points="200.0,960.0 193.0,952.0 162.0,952.0 162.0,968.0 193.0,968.0"/><text x="177.5" y="960" text-anchor="middle" dominant-baseline="central">E4A</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Encoder 4 · pino C" aria-label="GND · terra">
+<text class="pnum" x="236" y="978" text-anchor="start" dominant-baseline="central">C</text>
+<line class="w" x1="200" y1="978" x2="230" y2="978"/>
+<g class="flag n-gnd"><polygon points="200.0,978.0 193.0,970.0 162.0,970.0 162.0,986.0 193.0,986.0"/><text x="177.5" y="978" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="E4B" tabindex="0" role="button" data-net="E4B" data-src="Encoder 4 · pino B" aria-label="E4B · encoder 4, fase B">
+<text class="pnum" x="236" y="996" text-anchor="start" dominant-baseline="central">B</text>
+<line class="w" x1="200" y1="996" x2="230" y2="996"/>
+<g class="flag n-enc"><polygon points="200.0,996.0 193.0,988.0 162.0,988.0 162.0,1004.0 193.0,1004.0"/><text x="177.5" y="996" text-anchor="middle" dominant-baseline="central">E4B</text></g>
+</g>
+<g class="hit" data-key="BTN4" tabindex="0" role="button" data-net="LIN1" data-comp="BTN4" data-src="Encoder 4 · botão (SW)" aria-label="Botão do encoder 4 · nota 4">
+<text class="pnum" x="316" y="967" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="967" x2="327" y2="967"/>
+<polygon class="dio" points="327,961 327,973 357,967"/>
+<line class="w bar" x1="357" y1="961" x2="357" y2="973"/>
+<line class="w" x1="357" y1="967" x2="362" y2="967"/>
+<line class="w" x1="362" y1="967" x2="378" y2="967"/>
+<g class="flag n-row"><polygon points="378.0,967.0 385.0,959.0 424.0,959.0 424.0,975.0 385.0,975.0"/><text x="404.5" y="967" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+</g>
+<g class="hit" data-key="COL4" tabindex="0" role="button" data-net="COL4" data-src="Encoder 4 · botão (SW)" aria-label="COL4 · coluna 4 da matriz">
+<text class="pnum" x="316" y="989" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="989" x2="378" y2="989"/>
+<g class="flag n-col"><polygon points="378.0,989.0 385.0,981.0 424.0,981.0 424.0,997.0 385.0,997.0"/><text x="404.5" y="989" text-anchor="middle" dominant-baseline="central">COL4</text></g>
+</g>
+<g class="hit" data-key="ENC5" tabindex="0" role="button" data-comp="ENC5" aria-label="Encoder 5">
+<rect class="chip" x="230" y="1030" width="92" height="64" rx="6"/>
+<circle class="knob" cx="296" cy="1062" r="14"/>
+<text class="lbl" x="258" y="1054" text-anchor="middle" dominant-baseline="central">E5</text>
+<text class="sub" x="258" y="1071" text-anchor="middle" dominant-baseline="central">CC 25</text>
+</g>
+<g class="hit" data-key="E5A" tabindex="0" role="button" data-net="E5A" data-src="Encoder 5 · pino A" aria-label="E5A · encoder 5, fase A">
+<text class="pnum" x="236" y="1044" text-anchor="start" dominant-baseline="central">A</text>
+<line class="w" x1="200" y1="1044" x2="230" y2="1044"/>
+<g class="flag n-enc"><polygon points="200.0,1044.0 193.0,1036.0 162.0,1036.0 162.0,1052.0 193.0,1052.0"/><text x="177.5" y="1044" text-anchor="middle" dominant-baseline="central">E5A</text></g>
+</g>
+<g class="hit" data-key="GND" tabindex="0" role="button" data-net="GND" data-src="Encoder 5 · pino C" aria-label="GND · terra">
+<text class="pnum" x="236" y="1062" text-anchor="start" dominant-baseline="central">C</text>
+<line class="w" x1="200" y1="1062" x2="230" y2="1062"/>
+<g class="flag n-gnd"><polygon points="200.0,1062.0 193.0,1054.0 162.0,1054.0 162.0,1070.0 193.0,1070.0"/><text x="177.5" y="1062" text-anchor="middle" dominant-baseline="central">GND</text></g>
+</g>
+<g class="hit" data-key="E5B" tabindex="0" role="button" data-net="E5B" data-src="Encoder 5 · pino B" aria-label="E5B · encoder 5, fase B">
+<text class="pnum" x="236" y="1080" text-anchor="start" dominant-baseline="central">B</text>
+<line class="w" x1="200" y1="1080" x2="230" y2="1080"/>
+<g class="flag n-enc"><polygon points="200.0,1080.0 193.0,1072.0 162.0,1072.0 162.0,1088.0 193.0,1088.0"/><text x="177.5" y="1080" text-anchor="middle" dominant-baseline="central">E5B</text></g>
+</g>
+<g class="hit" data-key="BTN5" tabindex="0" role="button" data-net="LIN1" data-comp="BTN5" data-src="Encoder 5 · botão (SW)" aria-label="Botão do encoder 5 · nota 5">
+<text class="pnum" x="316" y="1051" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="1051" x2="327" y2="1051"/>
+<polygon class="dio" points="327,1045 327,1057 357,1051"/>
+<line class="w bar" x1="357" y1="1045" x2="357" y2="1057"/>
+<line class="w" x1="357" y1="1051" x2="362" y2="1051"/>
+<line class="w" x1="362" y1="1051" x2="378" y2="1051"/>
+<g class="flag n-row"><polygon points="378.0,1051.0 385.0,1043.0 424.0,1043.0 424.0,1059.0 385.0,1059.0"/><text x="404.5" y="1051" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+</g>
+<g class="hit" data-key="COL5" tabindex="0" role="button" data-net="COL5" data-src="Encoder 5 · botão (SW)" aria-label="COL5 · coluna 5 da matriz">
+<text class="pnum" x="316" y="1073" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="1073" x2="378" y2="1073"/>
+<g class="flag n-col"><polygon points="378.0,1073.0 385.0,1065.0 424.0,1065.0 424.0,1081.0 385.0,1081.0"/><text x="404.5" y="1073" text-anchor="middle" dominant-baseline="central">COL5</text></g>
+</g>
+<text class="ttl" x="660" y="652" text-anchor="start" dominant-baseline="central">Matriz 7×5 · um diodo 1N4148 por tecla</text>
+<text class="sub" x="660" y="668" text-anchor="start" dominant-baseline="central">Faixa do diodo do lado da linha · n = nota MIDI</text>
+<g class="hit" data-key="LIN1" tabindex="0" role="button" data-net="LIN1" data-src="Matriz · linha 1" aria-label="LIN1 · linha 1 da matriz">
+<g class="flag n-row"><polygon points="710.0,752.0 703.0,744.0 664.0,744.0 664.0,760.0 703.0,760.0"/><text x="683.5" y="752" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+<line class="w bus" x1="710" y1="752" x2="1334" y2="752"/>
+</g>
+<g class="hit" data-key="LIN2" tabindex="0" role="button" data-net="LIN2" data-src="Matriz · linha 2" aria-label="LIN2 · linha 2 da matriz">
+<g class="flag n-row"><polygon points="710.0,806.0 703.0,798.0 664.0,798.0 664.0,814.0 703.0,814.0"/><text x="683.5" y="806" text-anchor="middle" dominant-baseline="central">LIN2</text></g>
+<line class="w bus" x1="710" y1="806" x2="1334" y2="806"/>
+</g>
+<g class="hit" data-key="LIN3" tabindex="0" role="button" data-net="LIN3" data-src="Matriz · linha 3" aria-label="LIN3 · linha 3 da matriz">
+<g class="flag n-row"><polygon points="710.0,860.0 703.0,852.0 664.0,852.0 664.0,868.0 703.0,868.0"/><text x="683.5" y="860" text-anchor="middle" dominant-baseline="central">LIN3</text></g>
+<line class="w bus" x1="710" y1="860" x2="1334" y2="860"/>
+</g>
+<g class="hit" data-key="LIN4" tabindex="0" role="button" data-net="LIN4" data-src="Matriz · linha 4" aria-label="LIN4 · linha 4 da matriz">
+<g class="flag n-row"><polygon points="710.0,914.0 703.0,906.0 664.0,906.0 664.0,922.0 703.0,922.0"/><text x="683.5" y="914" text-anchor="middle" dominant-baseline="central">LIN4</text></g>
+<line class="w bus" x1="710" y1="914" x2="1334" y2="914"/>
+</g>
+<g class="hit" data-key="LIN5" tabindex="0" role="button" data-net="LIN5" data-src="Matriz · linha 5" aria-label="LIN5 · linha 5 da matriz">
+<g class="flag n-row"><polygon points="710.0,968.0 703.0,960.0 664.0,960.0 664.0,976.0 703.0,976.0"/><text x="683.5" y="968" text-anchor="middle" dominant-baseline="central">LIN5</text></g>
+<line class="w bus" x1="710" y1="968" x2="1334" y2="968"/>
+</g>
+<g class="hit" data-key="LIN6" tabindex="0" role="button" data-net="LIN6" data-src="Matriz · linha 6" aria-label="LIN6 · linha 6 da matriz">
+<g class="flag n-row"><polygon points="710.0,1022.0 703.0,1014.0 664.0,1014.0 664.0,1030.0 703.0,1030.0"/><text x="683.5" y="1022" text-anchor="middle" dominant-baseline="central">LIN6</text></g>
+<line class="w bus" x1="710" y1="1022" x2="1334" y2="1022"/>
+</g>
+<g class="hit" data-key="LIN7" tabindex="0" role="button" data-net="LIN7" data-src="Matriz · linha 7" aria-label="LIN7 · linha 7 da matriz">
+<g class="flag n-row"><polygon points="710.0,1076.0 703.0,1068.0 664.0,1068.0 664.0,1084.0 703.0,1084.0"/><text x="683.5" y="1076" text-anchor="middle" dominant-baseline="central">LIN7</text></g>
+<line class="w bus" x1="710" y1="1076" x2="1334" y2="1076"/>
+</g>
+<g class="hit" data-key="COL1" tabindex="0" role="button" data-net="COL1" data-src="Matriz · coluna 1" aria-label="COL1 · coluna 1 da matriz">
+<g class="flag n-col"><polygon points="770.0,712.0 747.0,705.0 747.0,689.0 793.0,689.0 793.0,705.0"/><text x="770.0" y="697" text-anchor="middle" dominant-baseline="central">COL1</text></g>
+<line class="w bus" x1="770" y1="712" x2="770" y2="1042"/>
+</g>
+<g class="hit" data-key="COL2" tabindex="0" role="button" data-net="COL2" data-src="Matriz · coluna 2" aria-label="COL2 · coluna 2 da matriz">
+<g class="flag n-col"><polygon points="886.0,712.0 863.0,705.0 863.0,689.0 909.0,689.0 909.0,705.0"/><text x="886.0" y="697" text-anchor="middle" dominant-baseline="central">COL2</text></g>
+<line class="w bus" x1="886" y1="712" x2="886" y2="1042"/>
+</g>
+<g class="hit" data-key="COL3" tabindex="0" role="button" data-net="COL3" data-src="Matriz · coluna 3" aria-label="COL3 · coluna 3 da matriz">
+<g class="flag n-col"><polygon points="1002.0,712.0 979.0,705.0 979.0,689.0 1025.0,689.0 1025.0,705.0"/><text x="1002.0" y="697" text-anchor="middle" dominant-baseline="central">COL3</text></g>
+<line class="w bus" x1="1002" y1="712" x2="1002" y2="1042"/>
+</g>
+<g class="hit" data-key="COL4" tabindex="0" role="button" data-net="COL4" data-src="Matriz · coluna 4" aria-label="COL4 · coluna 4 da matriz">
+<g class="flag n-col"><polygon points="1118.0,712.0 1095.0,705.0 1095.0,689.0 1141.0,689.0 1141.0,705.0"/><text x="1118.0" y="697" text-anchor="middle" dominant-baseline="central">COL4</text></g>
+<line class="w bus" x1="1118" y1="712" x2="1118" y2="1042"/>
+</g>
+<g class="hit" data-key="COL5" tabindex="0" role="button" data-net="COL5" data-src="Matriz · coluna 5" aria-label="COL5 · coluna 5 da matriz">
+<g class="flag n-col"><polygon points="1234.0,712.0 1211.0,705.0 1211.0,689.0 1257.0,689.0 1257.0,705.0"/><text x="1234.0" y="697" text-anchor="middle" dominant-baseline="central">COL5</text></g>
+<line class="w bus" x1="1234" y1="712" x2="1234" y2="1042"/>
+</g>
+<g class="hit" data-key="BTN1" tabindex="0" role="button" data-net="LIN1 COL1" data-comp="BTN1" aria-label="Botão do encoder 1 · nota 1">
+<rect class="hitpad" x="772" y="706" width="96" height="46"/>
+<rect class="ghost" x="780" y="708" width="70" height="30" rx="4"/>
+<text class="ghost-t" x="815" y="723" text-anchor="middle" dominant-baseline="central">botão E1</text>
+</g>
+<g class="hit" data-key="BTN2" tabindex="0" role="button" data-net="LIN1 COL2" data-comp="BTN2" aria-label="Botão do encoder 2 · nota 2">
+<rect class="hitpad" x="888" y="706" width="96" height="46"/>
+<rect class="ghost" x="896" y="708" width="70" height="30" rx="4"/>
+<text class="ghost-t" x="931" y="723" text-anchor="middle" dominant-baseline="central">botão E2</text>
+</g>
+<g class="hit" data-key="BTN3" tabindex="0" role="button" data-net="LIN1 COL3" data-comp="BTN3" aria-label="Botão do encoder 3 · nota 3">
+<rect class="hitpad" x="1004" y="706" width="96" height="46"/>
+<rect class="ghost" x="1012" y="708" width="70" height="30" rx="4"/>
+<text class="ghost-t" x="1047" y="723" text-anchor="middle" dominant-baseline="central">botão E3</text>
+</g>
+<g class="hit" data-key="BTN4" tabindex="0" role="button" data-net="LIN1 COL4" data-comp="BTN4" aria-label="Botão do encoder 4 · nota 4">
+<rect class="hitpad" x="1120" y="706" width="96" height="46"/>
+<rect class="ghost" x="1128" y="708" width="70" height="30" rx="4"/>
+<text class="ghost-t" x="1163" y="723" text-anchor="middle" dominant-baseline="central">botão E4</text>
+</g>
+<g class="hit" data-key="BTN5" tabindex="0" role="button" data-net="LIN1 COL5" data-comp="BTN5" aria-label="Botão do encoder 5 · nota 5">
+<rect class="hitpad" x="1236" y="706" width="96" height="46"/>
+<rect class="ghost" x="1244" y="708" width="70" height="30" rx="4"/>
+<text class="ghost-t" x="1279" y="723" text-anchor="middle" dominant-baseline="central">botão E5</text>
+</g>
+<g class="hit" data-key="BTN6" tabindex="0" role="button" data-net="LIN2 COL1" data-comp="BTN6" aria-label="Botão n6">
+<rect class="hitpad" x="772" y="760" width="96" height="46"/>
+<circle class="jn" cx="770" cy="774" r="3"/>
+<line class="w" x1="770" y1="774" x2="782" y2="774"/>
+<circle class="term" cx="784" cy="774" r="2.4"/>
+<circle class="term" cx="810" cy="774" r="2.4"/>
+<line class="w" x1="786" y1="773" x2="806" y2="764"/>
+<line class="w" x1="812" y1="774" x2="828" y2="774"/>
+<line class="w" x1="828" y1="774" x2="828" y2="780"/>
+<polygon class="dio" points="822,780 834,780 828,800"/>
+<line class="w bar" x1="822" y1="800" x2="834" y2="800"/>
+<line class="w" x1="828" y1="800" x2="828" y2="806"/>
+<circle class="jn" cx="828" cy="806" r="3"/>
+<text class="pnum" x="840" y="776" text-anchor="start" dominant-baseline="central">n6</text>
+</g>
+<g class="hit" data-key="BTN7" tabindex="0" role="button" data-net="LIN2 COL2" data-comp="BTN7" aria-label="Botão n7">
+<rect class="hitpad" x="888" y="760" width="96" height="46"/>
+<circle class="jn" cx="886" cy="774" r="3"/>
+<line class="w" x1="886" y1="774" x2="898" y2="774"/>
+<circle class="term" cx="900" cy="774" r="2.4"/>
+<circle class="term" cx="926" cy="774" r="2.4"/>
+<line class="w" x1="902" y1="773" x2="922" y2="764"/>
+<line class="w" x1="928" y1="774" x2="944" y2="774"/>
+<line class="w" x1="944" y1="774" x2="944" y2="780"/>
+<polygon class="dio" points="938,780 950,780 944,800"/>
+<line class="w bar" x1="938" y1="800" x2="950" y2="800"/>
+<line class="w" x1="944" y1="800" x2="944" y2="806"/>
+<circle class="jn" cx="944" cy="806" r="3"/>
+<text class="pnum" x="956" y="776" text-anchor="start" dominant-baseline="central">n7</text>
+</g>
+<g class="hit" data-key="BTN8" tabindex="0" role="button" data-net="LIN2 COL3" data-comp="BTN8" aria-label="Botão n8">
+<rect class="hitpad" x="1004" y="760" width="96" height="46"/>
+<circle class="jn" cx="1002" cy="774" r="3"/>
+<line class="w" x1="1002" y1="774" x2="1014" y2="774"/>
+<circle class="term" cx="1016" cy="774" r="2.4"/>
+<circle class="term" cx="1042" cy="774" r="2.4"/>
+<line class="w" x1="1018" y1="773" x2="1038" y2="764"/>
+<line class="w" x1="1044" y1="774" x2="1060" y2="774"/>
+<line class="w" x1="1060" y1="774" x2="1060" y2="780"/>
+<polygon class="dio" points="1054,780 1066,780 1060,800"/>
+<line class="w bar" x1="1054" y1="800" x2="1066" y2="800"/>
+<line class="w" x1="1060" y1="800" x2="1060" y2="806"/>
+<circle class="jn" cx="1060" cy="806" r="3"/>
+<text class="pnum" x="1072" y="776" text-anchor="start" dominant-baseline="central">n8</text>
+</g>
+<g class="hit" data-key="BTN9" tabindex="0" role="button" data-net="LIN2 COL4" data-comp="BTN9" aria-label="Botão n9">
+<rect class="hitpad" x="1120" y="760" width="96" height="46"/>
+<circle class="jn" cx="1118" cy="774" r="3"/>
+<line class="w" x1="1118" y1="774" x2="1130" y2="774"/>
+<circle class="term" cx="1132" cy="774" r="2.4"/>
+<circle class="term" cx="1158" cy="774" r="2.4"/>
+<line class="w" x1="1134" y1="773" x2="1154" y2="764"/>
+<line class="w" x1="1160" y1="774" x2="1176" y2="774"/>
+<line class="w" x1="1176" y1="774" x2="1176" y2="780"/>
+<polygon class="dio" points="1170,780 1182,780 1176,800"/>
+<line class="w bar" x1="1170" y1="800" x2="1182" y2="800"/>
+<line class="w" x1="1176" y1="800" x2="1176" y2="806"/>
+<circle class="jn" cx="1176" cy="806" r="3"/>
+<text class="pnum" x="1188" y="776" text-anchor="start" dominant-baseline="central">n9</text>
+</g>
+<g class="hit" data-key="BTN10" tabindex="0" role="button" data-net="LIN2 COL5" data-comp="BTN10" aria-label="Botão n10">
+<rect class="hitpad" x="1236" y="760" width="96" height="46"/>
+<circle class="jn" cx="1234" cy="774" r="3"/>
+<line class="w" x1="1234" y1="774" x2="1246" y2="774"/>
+<circle class="term" cx="1248" cy="774" r="2.4"/>
+<circle class="term" cx="1274" cy="774" r="2.4"/>
+<line class="w" x1="1250" y1="773" x2="1270" y2="764"/>
+<line class="w" x1="1276" y1="774" x2="1292" y2="774"/>
+<line class="w" x1="1292" y1="774" x2="1292" y2="780"/>
+<polygon class="dio" points="1286,780 1298,780 1292,800"/>
+<line class="w bar" x1="1286" y1="800" x2="1298" y2="800"/>
+<line class="w" x1="1292" y1="800" x2="1292" y2="806"/>
+<circle class="jn" cx="1292" cy="806" r="3"/>
+<text class="pnum" x="1304" y="776" text-anchor="start" dominant-baseline="central">n10</text>
+</g>
+<g class="hit" data-key="BTN11" tabindex="0" role="button" data-net="LIN3 COL1" data-comp="BTN11" aria-label="Botão n11">
+<rect class="hitpad" x="772" y="814" width="96" height="46"/>
+<circle class="jn" cx="770" cy="828" r="3"/>
+<line class="w" x1="770" y1="828" x2="782" y2="828"/>
+<circle class="term" cx="784" cy="828" r="2.4"/>
+<circle class="term" cx="810" cy="828" r="2.4"/>
+<line class="w" x1="786" y1="827" x2="806" y2="818"/>
+<line class="w" x1="812" y1="828" x2="828" y2="828"/>
+<line class="w" x1="828" y1="828" x2="828" y2="834"/>
+<polygon class="dio" points="822,834 834,834 828,854"/>
+<line class="w bar" x1="822" y1="854" x2="834" y2="854"/>
+<line class="w" x1="828" y1="854" x2="828" y2="860"/>
+<circle class="jn" cx="828" cy="860" r="3"/>
+<text class="pnum" x="840" y="830" text-anchor="start" dominant-baseline="central">n11</text>
+</g>
+<g class="hit" data-key="BTN12" tabindex="0" role="button" data-net="LIN3 COL2" data-comp="BTN12" aria-label="Botão n12">
+<rect class="hitpad" x="888" y="814" width="96" height="46"/>
+<circle class="jn" cx="886" cy="828" r="3"/>
+<line class="w" x1="886" y1="828" x2="898" y2="828"/>
+<circle class="term" cx="900" cy="828" r="2.4"/>
+<circle class="term" cx="926" cy="828" r="2.4"/>
+<line class="w" x1="902" y1="827" x2="922" y2="818"/>
+<line class="w" x1="928" y1="828" x2="944" y2="828"/>
+<line class="w" x1="944" y1="828" x2="944" y2="834"/>
+<polygon class="dio" points="938,834 950,834 944,854"/>
+<line class="w bar" x1="938" y1="854" x2="950" y2="854"/>
+<line class="w" x1="944" y1="854" x2="944" y2="860"/>
+<circle class="jn" cx="944" cy="860" r="3"/>
+<text class="pnum" x="956" y="830" text-anchor="start" dominant-baseline="central">n12</text>
+</g>
+<g class="hit" data-key="BTN13" tabindex="0" role="button" data-net="LIN3 COL3" data-comp="BTN13" aria-label="Botão n13">
+<rect class="hitpad" x="1004" y="814" width="96" height="46"/>
+<circle class="jn" cx="1002" cy="828" r="3"/>
+<line class="w" x1="1002" y1="828" x2="1014" y2="828"/>
+<circle class="term" cx="1016" cy="828" r="2.4"/>
+<circle class="term" cx="1042" cy="828" r="2.4"/>
+<line class="w" x1="1018" y1="827" x2="1038" y2="818"/>
+<line class="w" x1="1044" y1="828" x2="1060" y2="828"/>
+<line class="w" x1="1060" y1="828" x2="1060" y2="834"/>
+<polygon class="dio" points="1054,834 1066,834 1060,854"/>
+<line class="w bar" x1="1054" y1="854" x2="1066" y2="854"/>
+<line class="w" x1="1060" y1="854" x2="1060" y2="860"/>
+<circle class="jn" cx="1060" cy="860" r="3"/>
+<text class="pnum" x="1072" y="830" text-anchor="start" dominant-baseline="central">n13</text>
+</g>
+<g class="hit" data-key="BTN14" tabindex="0" role="button" data-net="LIN3 COL4" data-comp="BTN14" aria-label="Botão n14">
+<rect class="hitpad" x="1120" y="814" width="96" height="46"/>
+<circle class="jn" cx="1118" cy="828" r="3"/>
+<line class="w" x1="1118" y1="828" x2="1130" y2="828"/>
+<circle class="term" cx="1132" cy="828" r="2.4"/>
+<circle class="term" cx="1158" cy="828" r="2.4"/>
+<line class="w" x1="1134" y1="827" x2="1154" y2="818"/>
+<line class="w" x1="1160" y1="828" x2="1176" y2="828"/>
+<line class="w" x1="1176" y1="828" x2="1176" y2="834"/>
+<polygon class="dio" points="1170,834 1182,834 1176,854"/>
+<line class="w bar" x1="1170" y1="854" x2="1182" y2="854"/>
+<line class="w" x1="1176" y1="854" x2="1176" y2="860"/>
+<circle class="jn" cx="1176" cy="860" r="3"/>
+<text class="pnum" x="1188" y="830" text-anchor="start" dominant-baseline="central">n14</text>
+</g>
+<g class="hit" data-key="BTN15" tabindex="0" role="button" data-net="LIN3 COL5" data-comp="BTN15" aria-label="Botão n15">
+<rect class="hitpad" x="1236" y="814" width="96" height="46"/>
+<circle class="jn" cx="1234" cy="828" r="3"/>
+<line class="w" x1="1234" y1="828" x2="1246" y2="828"/>
+<circle class="term" cx="1248" cy="828" r="2.4"/>
+<circle class="term" cx="1274" cy="828" r="2.4"/>
+<line class="w" x1="1250" y1="827" x2="1270" y2="818"/>
+<line class="w" x1="1276" y1="828" x2="1292" y2="828"/>
+<line class="w" x1="1292" y1="828" x2="1292" y2="834"/>
+<polygon class="dio" points="1286,834 1298,834 1292,854"/>
+<line class="w bar" x1="1286" y1="854" x2="1298" y2="854"/>
+<line class="w" x1="1292" y1="854" x2="1292" y2="860"/>
+<circle class="jn" cx="1292" cy="860" r="3"/>
+<text class="pnum" x="1304" y="830" text-anchor="start" dominant-baseline="central">n15</text>
+</g>
+<g class="hit" data-key="BTN16" tabindex="0" role="button" data-net="LIN4 COL1" data-comp="BTN16" aria-label="Botão n16">
+<rect class="hitpad" x="772" y="868" width="96" height="46"/>
+<circle class="jn" cx="770" cy="882" r="3"/>
+<line class="w" x1="770" y1="882" x2="782" y2="882"/>
+<circle class="term" cx="784" cy="882" r="2.4"/>
+<circle class="term" cx="810" cy="882" r="2.4"/>
+<line class="w" x1="786" y1="881" x2="806" y2="872"/>
+<line class="w" x1="812" y1="882" x2="828" y2="882"/>
+<line class="w" x1="828" y1="882" x2="828" y2="888"/>
+<polygon class="dio" points="822,888 834,888 828,908"/>
+<line class="w bar" x1="822" y1="908" x2="834" y2="908"/>
+<line class="w" x1="828" y1="908" x2="828" y2="914"/>
+<circle class="jn" cx="828" cy="914" r="3"/>
+<text class="pnum" x="840" y="884" text-anchor="start" dominant-baseline="central">n16</text>
+</g>
+<g class="hit" data-key="BTN17" tabindex="0" role="button" data-net="LIN4 COL2" data-comp="BTN17" aria-label="Botão n17">
+<rect class="hitpad" x="888" y="868" width="96" height="46"/>
+<circle class="jn" cx="886" cy="882" r="3"/>
+<line class="w" x1="886" y1="882" x2="898" y2="882"/>
+<circle class="term" cx="900" cy="882" r="2.4"/>
+<circle class="term" cx="926" cy="882" r="2.4"/>
+<line class="w" x1="902" y1="881" x2="922" y2="872"/>
+<line class="w" x1="928" y1="882" x2="944" y2="882"/>
+<line class="w" x1="944" y1="882" x2="944" y2="888"/>
+<polygon class="dio" points="938,888 950,888 944,908"/>
+<line class="w bar" x1="938" y1="908" x2="950" y2="908"/>
+<line class="w" x1="944" y1="908" x2="944" y2="914"/>
+<circle class="jn" cx="944" cy="914" r="3"/>
+<text class="pnum" x="956" y="884" text-anchor="start" dominant-baseline="central">n17</text>
+</g>
+<g class="hit" data-key="BTN18" tabindex="0" role="button" data-net="LIN4 COL3" data-comp="BTN18" aria-label="Botão n18">
+<rect class="hitpad" x="1004" y="868" width="96" height="46"/>
+<circle class="jn" cx="1002" cy="882" r="3"/>
+<line class="w" x1="1002" y1="882" x2="1014" y2="882"/>
+<circle class="term" cx="1016" cy="882" r="2.4"/>
+<circle class="term" cx="1042" cy="882" r="2.4"/>
+<line class="w" x1="1018" y1="881" x2="1038" y2="872"/>
+<line class="w" x1="1044" y1="882" x2="1060" y2="882"/>
+<line class="w" x1="1060" y1="882" x2="1060" y2="888"/>
+<polygon class="dio" points="1054,888 1066,888 1060,908"/>
+<line class="w bar" x1="1054" y1="908" x2="1066" y2="908"/>
+<line class="w" x1="1060" y1="908" x2="1060" y2="914"/>
+<circle class="jn" cx="1060" cy="914" r="3"/>
+<text class="pnum" x="1072" y="884" text-anchor="start" dominant-baseline="central">n18</text>
+</g>
+<g class="hit" data-key="BTN19" tabindex="0" role="button" data-net="LIN4 COL4" data-comp="BTN19" aria-label="Botão n19">
+<rect class="hitpad" x="1120" y="868" width="96" height="46"/>
+<circle class="jn" cx="1118" cy="882" r="3"/>
+<line class="w" x1="1118" y1="882" x2="1130" y2="882"/>
+<circle class="term" cx="1132" cy="882" r="2.4"/>
+<circle class="term" cx="1158" cy="882" r="2.4"/>
+<line class="w" x1="1134" y1="881" x2="1154" y2="872"/>
+<line class="w" x1="1160" y1="882" x2="1176" y2="882"/>
+<line class="w" x1="1176" y1="882" x2="1176" y2="888"/>
+<polygon class="dio" points="1170,888 1182,888 1176,908"/>
+<line class="w bar" x1="1170" y1="908" x2="1182" y2="908"/>
+<line class="w" x1="1176" y1="908" x2="1176" y2="914"/>
+<circle class="jn" cx="1176" cy="914" r="3"/>
+<text class="pnum" x="1188" y="884" text-anchor="start" dominant-baseline="central">n19</text>
+</g>
+<g class="hit" data-key="BTN20" tabindex="0" role="button" data-net="LIN4 COL5" data-comp="BTN20" aria-label="Botão n20">
+<rect class="hitpad" x="1236" y="868" width="96" height="46"/>
+<circle class="jn" cx="1234" cy="882" r="3"/>
+<line class="w" x1="1234" y1="882" x2="1246" y2="882"/>
+<circle class="term" cx="1248" cy="882" r="2.4"/>
+<circle class="term" cx="1274" cy="882" r="2.4"/>
+<line class="w" x1="1250" y1="881" x2="1270" y2="872"/>
+<line class="w" x1="1276" y1="882" x2="1292" y2="882"/>
+<line class="w" x1="1292" y1="882" x2="1292" y2="888"/>
+<polygon class="dio" points="1286,888 1298,888 1292,908"/>
+<line class="w bar" x1="1286" y1="908" x2="1298" y2="908"/>
+<line class="w" x1="1292" y1="908" x2="1292" y2="914"/>
+<circle class="jn" cx="1292" cy="914" r="3"/>
+<text class="pnum" x="1304" y="884" text-anchor="start" dominant-baseline="central">n20</text>
+</g>
+<g class="hit" data-key="BTN21" tabindex="0" role="button" data-net="LIN5 COL1" data-comp="BTN21" aria-label="Botão n21">
+<rect class="hitpad" x="772" y="922" width="96" height="46"/>
+<circle class="jn" cx="770" cy="936" r="3"/>
+<line class="w" x1="770" y1="936" x2="782" y2="936"/>
+<circle class="term" cx="784" cy="936" r="2.4"/>
+<circle class="term" cx="810" cy="936" r="2.4"/>
+<line class="w" x1="786" y1="935" x2="806" y2="926"/>
+<line class="w" x1="812" y1="936" x2="828" y2="936"/>
+<line class="w" x1="828" y1="936" x2="828" y2="942"/>
+<polygon class="dio" points="822,942 834,942 828,962"/>
+<line class="w bar" x1="822" y1="962" x2="834" y2="962"/>
+<line class="w" x1="828" y1="962" x2="828" y2="968"/>
+<circle class="jn" cx="828" cy="968" r="3"/>
+<text class="pnum" x="840" y="938" text-anchor="start" dominant-baseline="central">n21</text>
+</g>
+<g class="hit" data-key="BTN22" tabindex="0" role="button" data-net="LIN5 COL2" data-comp="BTN22" aria-label="Botão n22">
+<rect class="hitpad" x="888" y="922" width="96" height="46"/>
+<circle class="jn" cx="886" cy="936" r="3"/>
+<line class="w" x1="886" y1="936" x2="898" y2="936"/>
+<circle class="term" cx="900" cy="936" r="2.4"/>
+<circle class="term" cx="926" cy="936" r="2.4"/>
+<line class="w" x1="902" y1="935" x2="922" y2="926"/>
+<line class="w" x1="928" y1="936" x2="944" y2="936"/>
+<line class="w" x1="944" y1="936" x2="944" y2="942"/>
+<polygon class="dio" points="938,942 950,942 944,962"/>
+<line class="w bar" x1="938" y1="962" x2="950" y2="962"/>
+<line class="w" x1="944" y1="962" x2="944" y2="968"/>
+<circle class="jn" cx="944" cy="968" r="3"/>
+<text class="pnum" x="956" y="938" text-anchor="start" dominant-baseline="central">n22</text>
+</g>
+<g class="hit" data-key="BTN23" tabindex="0" role="button" data-net="LIN5 COL3" data-comp="BTN23" aria-label="Botão n23">
+<rect class="hitpad" x="1004" y="922" width="96" height="46"/>
+<circle class="jn" cx="1002" cy="936" r="3"/>
+<line class="w" x1="1002" y1="936" x2="1014" y2="936"/>
+<circle class="term" cx="1016" cy="936" r="2.4"/>
+<circle class="term" cx="1042" cy="936" r="2.4"/>
+<line class="w" x1="1018" y1="935" x2="1038" y2="926"/>
+<line class="w" x1="1044" y1="936" x2="1060" y2="936"/>
+<line class="w" x1="1060" y1="936" x2="1060" y2="942"/>
+<polygon class="dio" points="1054,942 1066,942 1060,962"/>
+<line class="w bar" x1="1054" y1="962" x2="1066" y2="962"/>
+<line class="w" x1="1060" y1="962" x2="1060" y2="968"/>
+<circle class="jn" cx="1060" cy="968" r="3"/>
+<text class="pnum" x="1072" y="938" text-anchor="start" dominant-baseline="central">n23</text>
+</g>
+<g class="hit" data-key="BTN24" tabindex="0" role="button" data-net="LIN5 COL4" data-comp="BTN24" aria-label="Botão n24">
+<rect class="hitpad" x="1120" y="922" width="96" height="46"/>
+<circle class="jn" cx="1118" cy="936" r="3"/>
+<line class="w" x1="1118" y1="936" x2="1130" y2="936"/>
+<circle class="term" cx="1132" cy="936" r="2.4"/>
+<circle class="term" cx="1158" cy="936" r="2.4"/>
+<line class="w" x1="1134" y1="935" x2="1154" y2="926"/>
+<line class="w" x1="1160" y1="936" x2="1176" y2="936"/>
+<line class="w" x1="1176" y1="936" x2="1176" y2="942"/>
+<polygon class="dio" points="1170,942 1182,942 1176,962"/>
+<line class="w bar" x1="1170" y1="962" x2="1182" y2="962"/>
+<line class="w" x1="1176" y1="962" x2="1176" y2="968"/>
+<circle class="jn" cx="1176" cy="968" r="3"/>
+<text class="pnum" x="1188" y="938" text-anchor="start" dominant-baseline="central">n24</text>
+</g>
+<g class="hit" data-key="BTN25" tabindex="0" role="button" data-net="LIN5 COL5" data-comp="BTN25" aria-label="Botão n25">
+<rect class="hitpad" x="1236" y="922" width="96" height="46"/>
+<circle class="jn" cx="1234" cy="936" r="3"/>
+<line class="w" x1="1234" y1="936" x2="1246" y2="936"/>
+<circle class="term" cx="1248" cy="936" r="2.4"/>
+<circle class="term" cx="1274" cy="936" r="2.4"/>
+<line class="w" x1="1250" y1="935" x2="1270" y2="926"/>
+<line class="w" x1="1276" y1="936" x2="1292" y2="936"/>
+<line class="w" x1="1292" y1="936" x2="1292" y2="942"/>
+<polygon class="dio" points="1286,942 1298,942 1292,962"/>
+<line class="w bar" x1="1286" y1="962" x2="1298" y2="962"/>
+<line class="w" x1="1292" y1="962" x2="1292" y2="968"/>
+<circle class="jn" cx="1292" cy="968" r="3"/>
+<text class="pnum" x="1304" y="938" text-anchor="start" dominant-baseline="central">n25</text>
+</g>
+<g class="hit" data-key="BTN26" tabindex="0" role="button" data-net="LIN6 COL1" data-comp="BTN26" aria-label="Botão n26">
+<rect class="hitpad" x="772" y="976" width="96" height="46"/>
+<circle class="jn" cx="770" cy="990" r="3"/>
+<line class="w" x1="770" y1="990" x2="782" y2="990"/>
+<circle class="term" cx="784" cy="990" r="2.4"/>
+<circle class="term" cx="810" cy="990" r="2.4"/>
+<line class="w" x1="786" y1="989" x2="806" y2="980"/>
+<line class="w" x1="812" y1="990" x2="828" y2="990"/>
+<line class="w" x1="828" y1="990" x2="828" y2="996"/>
+<polygon class="dio" points="822,996 834,996 828,1016"/>
+<line class="w bar" x1="822" y1="1016" x2="834" y2="1016"/>
+<line class="w" x1="828" y1="1016" x2="828" y2="1022"/>
+<circle class="jn" cx="828" cy="1022" r="3"/>
+<text class="pnum" x="840" y="992" text-anchor="start" dominant-baseline="central">n26</text>
+</g>
+<g class="hit" data-key="BTN27" tabindex="0" role="button" data-net="LIN6 COL2" data-comp="BTN27" aria-label="Botão n27">
+<rect class="hitpad" x="888" y="976" width="96" height="46"/>
+<circle class="jn" cx="886" cy="990" r="3"/>
+<line class="w" x1="886" y1="990" x2="898" y2="990"/>
+<circle class="term" cx="900" cy="990" r="2.4"/>
+<circle class="term" cx="926" cy="990" r="2.4"/>
+<line class="w" x1="902" y1="989" x2="922" y2="980"/>
+<line class="w" x1="928" y1="990" x2="944" y2="990"/>
+<line class="w" x1="944" y1="990" x2="944" y2="996"/>
+<polygon class="dio" points="938,996 950,996 944,1016"/>
+<line class="w bar" x1="938" y1="1016" x2="950" y2="1016"/>
+<line class="w" x1="944" y1="1016" x2="944" y2="1022"/>
+<circle class="jn" cx="944" cy="1022" r="3"/>
+<text class="pnum" x="956" y="992" text-anchor="start" dominant-baseline="central">n27</text>
+</g>
+<g class="hit" data-key="BTN28" tabindex="0" role="button" data-net="LIN6 COL3" data-comp="BTN28" aria-label="Botão n28">
+<rect class="hitpad" x="1004" y="976" width="96" height="46"/>
+<circle class="jn" cx="1002" cy="990" r="3"/>
+<line class="w" x1="1002" y1="990" x2="1014" y2="990"/>
+<circle class="term" cx="1016" cy="990" r="2.4"/>
+<circle class="term" cx="1042" cy="990" r="2.4"/>
+<line class="w" x1="1018" y1="989" x2="1038" y2="980"/>
+<line class="w" x1="1044" y1="990" x2="1060" y2="990"/>
+<line class="w" x1="1060" y1="990" x2="1060" y2="996"/>
+<polygon class="dio" points="1054,996 1066,996 1060,1016"/>
+<line class="w bar" x1="1054" y1="1016" x2="1066" y2="1016"/>
+<line class="w" x1="1060" y1="1016" x2="1060" y2="1022"/>
+<circle class="jn" cx="1060" cy="1022" r="3"/>
+<text class="pnum" x="1072" y="992" text-anchor="start" dominant-baseline="central">n28</text>
+</g>
+<g class="hit" data-key="BTN29" tabindex="0" role="button" data-net="LIN6 COL4" data-comp="BTN29" aria-label="Botão n29">
+<rect class="hitpad" x="1120" y="976" width="96" height="46"/>
+<circle class="jn" cx="1118" cy="990" r="3"/>
+<line class="w" x1="1118" y1="990" x2="1130" y2="990"/>
+<circle class="term" cx="1132" cy="990" r="2.4"/>
+<circle class="term" cx="1158" cy="990" r="2.4"/>
+<line class="w" x1="1134" y1="989" x2="1154" y2="980"/>
+<line class="w" x1="1160" y1="990" x2="1176" y2="990"/>
+<line class="w" x1="1176" y1="990" x2="1176" y2="996"/>
+<polygon class="dio" points="1170,996 1182,996 1176,1016"/>
+<line class="w bar" x1="1170" y1="1016" x2="1182" y2="1016"/>
+<line class="w" x1="1176" y1="1016" x2="1176" y2="1022"/>
+<circle class="jn" cx="1176" cy="1022" r="3"/>
+<text class="pnum" x="1188" y="992" text-anchor="start" dominant-baseline="central">n29</text>
+</g>
+<g class="hit" data-key="BTN30" tabindex="0" role="button" data-net="LIN6 COL5" data-comp="BTN30" aria-label="Botão n30">
+<rect class="hitpad" x="1236" y="976" width="96" height="46"/>
+<circle class="jn" cx="1234" cy="990" r="3"/>
+<line class="w" x1="1234" y1="990" x2="1246" y2="990"/>
+<circle class="term" cx="1248" cy="990" r="2.4"/>
+<circle class="term" cx="1274" cy="990" r="2.4"/>
+<line class="w" x1="1250" y1="989" x2="1270" y2="980"/>
+<line class="w" x1="1276" y1="990" x2="1292" y2="990"/>
+<line class="w" x1="1292" y1="990" x2="1292" y2="996"/>
+<polygon class="dio" points="1286,996 1298,996 1292,1016"/>
+<line class="w bar" x1="1286" y1="1016" x2="1298" y2="1016"/>
+<line class="w" x1="1292" y1="1016" x2="1292" y2="1022"/>
+<circle class="jn" cx="1292" cy="1022" r="3"/>
+<text class="pnum" x="1304" y="992" text-anchor="start" dominant-baseline="central">n30</text>
+</g>
+<g class="hit" data-key="BTN31" tabindex="0" role="button" data-net="LIN7 COL1" data-comp="BTN31" aria-label="Botão n31">
+<rect class="hitpad" x="772" y="1030" width="96" height="46"/>
+<circle class="jn" cx="770" cy="1044" r="3"/>
+<line class="w" x1="770" y1="1044" x2="782" y2="1044"/>
+<circle class="term" cx="784" cy="1044" r="2.4"/>
+<circle class="term" cx="810" cy="1044" r="2.4"/>
+<line class="w" x1="786" y1="1043" x2="806" y2="1034"/>
+<line class="w" x1="812" y1="1044" x2="828" y2="1044"/>
+<line class="w" x1="828" y1="1044" x2="828" y2="1050"/>
+<polygon class="dio" points="822,1050 834,1050 828,1070"/>
+<line class="w bar" x1="822" y1="1070" x2="834" y2="1070"/>
+<line class="w" x1="828" y1="1070" x2="828" y2="1076"/>
+<circle class="jn" cx="828" cy="1076" r="3"/>
+<text class="pnum" x="840" y="1046" text-anchor="start" dominant-baseline="central">n31</text>
+</g>
+<g class="hit" data-key="BTN32" tabindex="0" role="button" data-net="LIN7 COL2" data-comp="BTN32" aria-label="Botão n32">
+<rect class="hitpad" x="888" y="1030" width="96" height="46"/>
+<circle class="jn" cx="886" cy="1044" r="3"/>
+<line class="w" x1="886" y1="1044" x2="898" y2="1044"/>
+<circle class="term" cx="900" cy="1044" r="2.4"/>
+<circle class="term" cx="926" cy="1044" r="2.4"/>
+<line class="w" x1="902" y1="1043" x2="922" y2="1034"/>
+<line class="w" x1="928" y1="1044" x2="944" y2="1044"/>
+<line class="w" x1="944" y1="1044" x2="944" y2="1050"/>
+<polygon class="dio" points="938,1050 950,1050 944,1070"/>
+<line class="w bar" x1="938" y1="1070" x2="950" y2="1070"/>
+<line class="w" x1="944" y1="1070" x2="944" y2="1076"/>
+<circle class="jn" cx="944" cy="1076" r="3"/>
+<text class="pnum" x="956" y="1046" text-anchor="start" dominant-baseline="central">n32</text>
+</g>
+<g class="hit" data-key="BTN33" tabindex="0" role="button" data-net="LIN7 COL3" data-comp="BTN33" aria-label="Botão n33">
+<rect class="hitpad" x="1004" y="1030" width="96" height="46"/>
+<circle class="jn" cx="1002" cy="1044" r="3"/>
+<line class="w" x1="1002" y1="1044" x2="1014" y2="1044"/>
+<circle class="term" cx="1016" cy="1044" r="2.4"/>
+<circle class="term" cx="1042" cy="1044" r="2.4"/>
+<line class="w" x1="1018" y1="1043" x2="1038" y2="1034"/>
+<line class="w" x1="1044" y1="1044" x2="1060" y2="1044"/>
+<line class="w" x1="1060" y1="1044" x2="1060" y2="1050"/>
+<polygon class="dio" points="1054,1050 1066,1050 1060,1070"/>
+<line class="w bar" x1="1054" y1="1070" x2="1066" y2="1070"/>
+<line class="w" x1="1060" y1="1070" x2="1060" y2="1076"/>
+<circle class="jn" cx="1060" cy="1076" r="3"/>
+<text class="pnum" x="1072" y="1046" text-anchor="start" dominant-baseline="central">n33</text>
+</g>
+<g class="hit" data-key="BTN34" tabindex="0" role="button" data-net="LIN7 COL4" data-comp="BTN34" aria-label="Botão n34">
+<rect class="hitpad" x="1120" y="1030" width="96" height="46"/>
+<circle class="jn" cx="1118" cy="1044" r="3"/>
+<line class="w" x1="1118" y1="1044" x2="1130" y2="1044"/>
+<circle class="term" cx="1132" cy="1044" r="2.4"/>
+<circle class="term" cx="1158" cy="1044" r="2.4"/>
+<line class="w" x1="1134" y1="1043" x2="1154" y2="1034"/>
+<line class="w" x1="1160" y1="1044" x2="1176" y2="1044"/>
+<line class="w" x1="1176" y1="1044" x2="1176" y2="1050"/>
+<polygon class="dio" points="1170,1050 1182,1050 1176,1070"/>
+<line class="w bar" x1="1170" y1="1070" x2="1182" y2="1070"/>
+<line class="w" x1="1176" y1="1070" x2="1176" y2="1076"/>
+<circle class="jn" cx="1176" cy="1076" r="3"/>
+<text class="pnum" x="1188" y="1046" text-anchor="start" dominant-baseline="central">n34</text>
+</g>
+<g class="hit" data-key="BTN35" tabindex="0" role="button" data-net="LIN7 COL5" data-comp="BTN35" aria-label="Botão n35">
+<rect class="hitpad" x="1236" y="1030" width="96" height="46"/>
+<circle class="jn" cx="1234" cy="1044" r="3"/>
+<line class="w" x1="1234" y1="1044" x2="1246" y2="1044"/>
+<circle class="term" cx="1248" cy="1044" r="2.4"/>
+<circle class="term" cx="1274" cy="1044" r="2.4"/>
+<line class="w" x1="1250" y1="1043" x2="1270" y2="1034"/>
+<line class="w" x1="1276" y1="1044" x2="1292" y2="1044"/>
+<line class="w" x1="1292" y1="1044" x2="1292" y2="1050"/>
+<polygon class="dio" points="1286,1050 1298,1050 1292,1070"/>
+<line class="w bar" x1="1286" y1="1070" x2="1298" y2="1070"/>
+<line class="w" x1="1292" y1="1070" x2="1292" y2="1076"/>
+<circle class="jn" cx="1292" cy="1076" r="3"/>
+<text class="pnum" x="1304" y="1046" text-anchor="start" dominant-baseline="central">n35</text>
+</g></svg></div>
+  <p class="hint">Etiquetas com o mesmo nome são o mesmo fio. No celular, arraste o esquema para os lados.</p>
+</section>
+</div>
+
+<script>
+const INFO = {"SDA": {"title": "SDA · dados I²C", "tag": "i2c", "desc": "Linha de dados do barramento I²C. Um único fio liga o Pro Micro ao MCP23017 e ao OLED.", "ends": ["Pro Micro · pino 2 (SDA)", "MCP23017 · pino 13 (SDA)", "OLED · pino SDA", "Resistor 4,7 kΩ para VCC (opcional)"], "code": "mcp.begin_I2C(0x20) · u8x8.begin()", "tip": "Fio curto. Muitos módulos OLED já trazem o resistor de pull-up.", "nets": ["SDA"], "comps": []}, "SCL": {"title": "SCL · clock I²C", "tag": "i2c", "desc": "Linha de clock do barramento I²C, compartilhada pelos mesmos três componentes do SDA.", "ends": ["Pro Micro · pino 3 (SCL)", "MCP23017 · pino 12 (SCL)", "OLED · pino SCL", "Resistor 4,7 kΩ para VCC (opcional)"], "code": "Wire.setClock(400000)", "tip": "O barramento roda a 400 kHz.", "nets": ["SCL"], "comps": []}, "VCC": {"title": "VCC · 5 V", "tag": "vcc", "desc": "Alimentação de 5 V que vem da USB, distribuída para todos os componentes.", "ends": ["Pro Micro · VCC", "MCP23017 · pino 9 (VDD)", "MCP23017 · pino 18 (RESET)", "OLED · VCC", "Topo dos faders 1 a 4", "Resistores de pull-up (opcionais)", "Capacitor 100 nF"], "code": "", "tip": "O pino 18 (RESET) do MCP precisa estar no VCC. Solto, o chip reinicia sozinho.", "nets": ["VCC"], "comps": []}, "GND": {"title": "GND · terra", "tag": "gnd", "desc": "Referência comum. Todos os GND do circuito precisam estar ligados entre si.", "ends": ["Pro Micro · 3 pinos GND", "MCP23017 · pino 10 (VSS)", "MCP23017 · pinos 15, 16, 17 (A0–A2)", "OLED · GND", "Base dos faders 1 a 4", "Pino C (meio) dos 5 encoders", "Capacitor 100 nF"], "code": "", "tip": "A0, A1 e A2 do MCP no GND definem o endereço 0x20.", "nets": ["GND"], "comps": []}, "E1A": {"title": "E1A · encoder 1, fase A", "tag": "enc", "desc": "Fase A do encoder 1. Com a fase B, o código descobre o sentido do giro e muda o CC 21.", "ends": ["MCP23017 · pino 21 (GPA0)", "Encoder 1 · pino A"], "code": "readEncoderState(0) lê o bit GPA0", "tip": "Pull-up interno do MCP ligado no código.", "nets": ["E1A"], "comps": ["ENC1"]}, "E1B": {"title": "E1B · encoder 1, fase B", "tag": "enc", "desc": "Fase B do encoder 1. Se o valor andar ao contrário, troque os fios A e B.", "ends": ["MCP23017 · pino 1 (GPB0)", "Encoder 1 · pino B"], "code": "readEncoderState(0) lê o bit GPB0", "tip": "", "nets": ["E1B"], "comps": ["ENC1"]}, "E2A": {"title": "E2A · encoder 2, fase A", "tag": "enc", "desc": "Fase A do encoder 2. Com a fase B, o código descobre o sentido do giro e muda o CC 22.", "ends": ["MCP23017 · pino 22 (GPA1)", "Encoder 2 · pino A"], "code": "readEncoderState(1) lê o bit GPA1", "tip": "Pull-up interno do MCP ligado no código.", "nets": ["E2A"], "comps": ["ENC2"]}, "E2B": {"title": "E2B · encoder 2, fase B", "tag": "enc", "desc": "Fase B do encoder 2. Se o valor andar ao contrário, troque os fios A e B.", "ends": ["MCP23017 · pino 2 (GPB1)", "Encoder 2 · pino B"], "code": "readEncoderState(1) lê o bit GPB1", "tip": "", "nets": ["E2B"], "comps": ["ENC2"]}, "E3A": {"title": "E3A · encoder 3, fase A", "tag": "enc", "desc": "Fase A do encoder 3. Com a fase B, o código descobre o sentido do giro e muda o CC 23.", "ends": ["MCP23017 · pino 23 (GPA2)", "Encoder 3 · pino A"], "code": "readEncoderState(2) lê o bit GPA2", "tip": "Pull-up interno do MCP ligado no código.", "nets": ["E3A"], "comps": ["ENC3"]}, "E3B": {"title": "E3B · encoder 3, fase B", "tag": "enc", "desc": "Fase B do encoder 3. Se o valor andar ao contrário, troque os fios A e B.", "ends": ["MCP23017 · pino 3 (GPB2)", "Encoder 3 · pino B"], "code": "readEncoderState(2) lê o bit GPB2", "tip": "", "nets": ["E3B"], "comps": ["ENC3"]}, "E4A": {"title": "E4A · encoder 4, fase A", "tag": "enc", "desc": "Fase A do encoder 4. Com a fase B, o código descobre o sentido do giro e muda o CC 24.", "ends": ["MCP23017 · pino 24 (GPA3)", "Encoder 4 · pino A"], "code": "readEncoderState(3) lê o bit GPA3", "tip": "Pull-up interno do MCP ligado no código.", "nets": ["E4A"], "comps": ["ENC4"]}, "E4B": {"title": "E4B · encoder 4, fase B", "tag": "enc", "desc": "Fase B do encoder 4. Se o valor andar ao contrário, troque os fios A e B.", "ends": ["MCP23017 · pino 4 (GPB3)", "Encoder 4 · pino B"], "code": "readEncoderState(3) lê o bit GPB3", "tip": "", "nets": ["E4B"], "comps": ["ENC4"]}, "E5A": {"title": "E5A · encoder 5, fase A", "tag": "enc", "desc": "Fase A do encoder 5. Com a fase B, o código descobre o sentido do giro e muda o CC 25.", "ends": ["MCP23017 · pino 25 (GPA4)", "Encoder 5 · pino A"], "code": "readEncoderState(4) lê o bit GPA4", "tip": "Pull-up interno do MCP ligado no código.", "nets": ["E5A"], "comps": ["ENC5"]}, "E5B": {"title": "E5B · encoder 5, fase B", "tag": "enc", "desc": "Fase B do encoder 5. Se o valor andar ao contrário, troque os fios A e B.", "ends": ["MCP23017 · pino 5 (GPB4)", "Encoder 5 · pino B"], "code": "readEncoderState(4) lê o bit GPB4", "tip": "", "nets": ["E5B"], "comps": ["ENC5"]}, "FD1": {"title": "FD1 · fader 1", "tag": "ana", "desc": "Cursor do fader 1. A tensão de 0 a 5 V vira o CC 30, de 0 a 127.", "ends": ["Pro Micro · A0 (pino 18)", "Fader 1 · terminal do meio (cursor)"], "code": "pots[0] = {A0, {30, CHANNEL_1}}", "tip": "Ligue as pontas de todos os faders do mesmo jeito (VCC em cima).", "nets": ["FD1"], "comps": ["FAD1"]}, "FD2": {"title": "FD2 · fader 2", "tag": "ana", "desc": "Cursor do fader 2. A tensão de 0 a 5 V vira o CC 31, de 0 a 127.", "ends": ["Pro Micro · A1 (pino 19)", "Fader 2 · terminal do meio (cursor)"], "code": "pots[1] = {A1, {31, CHANNEL_1}}", "tip": "Ligue as pontas de todos os faders do mesmo jeito (VCC em cima).", "nets": ["FD2"], "comps": ["FAD2"]}, "FD3": {"title": "FD3 · fader 3", "tag": "ana", "desc": "Cursor do fader 3. A tensão de 0 a 5 V vira o CC 32, de 0 a 127.", "ends": ["Pro Micro · A2 (pino 20)", "Fader 3 · terminal do meio (cursor)"], "code": "pots[2] = {A2, {32, CHANNEL_1}}", "tip": "Ligue as pontas de todos os faders do mesmo jeito (VCC em cima).", "nets": ["FD3"], "comps": ["FAD3"]}, "FD4": {"title": "FD4 · fader 4", "tag": "ana", "desc": "Cursor do fader 4. A tensão de 0 a 5 V vira o CC 33, de 0 a 127.", "ends": ["Pro Micro · A3 (pino 21)", "Fader 4 · terminal do meio (cursor)"], "code": "pots[3] = {A3, {33, CHANNEL_1}}", "tip": "Ligue as pontas de todos os faders do mesmo jeito (VCC em cima).", "nets": ["FD4"], "comps": ["FAD4"]}, "LIN1": {"title": "LIN1 · linha 1 da matriz", "tag": "row", "desc": "Botões de apertar dos 5 encoders (notas 1–5). A Control Surface puxa esta linha para LOW, uma de cada vez, e lê as colunas.", "ends": ["Pro Micro · pino 0", "Diodo do botão do encoder 1 (lado da faixa)", "Diodo do botão do encoder 2 (lado da faixa)", "Diodo do botão do encoder 3 (lado da faixa)", "Diodo do botão do encoder 4 (lado da faixa)", "Diodo do botão do encoder 5 (lado da faixa)"], "code": "NoteButtonMatrix: linha 1 = pino 0", "tip": "A faixa de cada diodo fica deste lado.", "nets": ["LIN1"], "comps": []}, "LIN2": {"title": "LIN2 · linha 2 da matriz", "tag": "row", "desc": "Pads da 1ª fileira (notas 6–10). A Control Surface puxa esta linha para LOW, uma de cada vez, e lê as colunas.", "ends": ["Pro Micro · pino 1", "Diodo do botão n6 (lado da faixa)", "Diodo do botão n7 (lado da faixa)", "Diodo do botão n8 (lado da faixa)", "Diodo do botão n9 (lado da faixa)", "Diodo do botão n10 (lado da faixa)"], "code": "NoteButtonMatrix: linha 2 = pino 1", "tip": "A faixa de cada diodo fica deste lado.", "nets": ["LIN2"], "comps": []}, "LIN3": {"title": "LIN3 · linha 3 da matriz", "tag": "row", "desc": "Pads da 2ª fileira (notas 11–15). A Control Surface puxa esta linha para LOW, uma de cada vez, e lê as colunas.", "ends": ["Pro Micro · pino 4", "Diodo do botão n11 (lado da faixa)", "Diodo do botão n12 (lado da faixa)", "Diodo do botão n13 (lado da faixa)", "Diodo do botão n14 (lado da faixa)", "Diodo do botão n15 (lado da faixa)"], "code": "NoteButtonMatrix: linha 3 = pino 4", "tip": "A faixa de cada diodo fica deste lado.", "nets": ["LIN3"], "comps": []}, "LIN4": {"title": "LIN4 · linha 4 da matriz", "tag": "row", "desc": "Pads da 3ª fileira (notas 16–20). A Control Surface puxa esta linha para LOW, uma de cada vez, e lê as colunas.", "ends": ["Pro Micro · pino 5", "Diodo do botão n16 (lado da faixa)", "Diodo do botão n17 (lado da faixa)", "Diodo do botão n18 (lado da faixa)", "Diodo do botão n19 (lado da faixa)", "Diodo do botão n20 (lado da faixa)"], "code": "NoteButtonMatrix: linha 4 = pino 5", "tip": "A faixa de cada diodo fica deste lado.", "nets": ["LIN4"], "comps": []}, "LIN5": {"title": "LIN5 · linha 5 da matriz", "tag": "row", "desc": "Pads da 4ª fileira (notas 21–25). A Control Surface puxa esta linha para LOW, uma de cada vez, e lê as colunas.", "ends": ["Pro Micro · pino 6", "Diodo do botão n21 (lado da faixa)", "Diodo do botão n22 (lado da faixa)", "Diodo do botão n23 (lado da faixa)", "Diodo do botão n24 (lado da faixa)", "Diodo do botão n25 (lado da faixa)"], "code": "NoteButtonMatrix: linha 5 = pino 6", "tip": "A faixa de cada diodo fica deste lado.", "nets": ["LIN5"], "comps": []}, "LIN6": {"title": "LIN6 · linha 6 da matriz", "tag": "row", "desc": "Pads da 5ª fileira (notas 26–30). A Control Surface puxa esta linha para LOW, uma de cada vez, e lê as colunas.", "ends": ["Pro Micro · pino 7", "Diodo do botão n26 (lado da faixa)", "Diodo do botão n27 (lado da faixa)", "Diodo do botão n28 (lado da faixa)", "Diodo do botão n29 (lado da faixa)", "Diodo do botão n30 (lado da faixa)"], "code": "NoteButtonMatrix: linha 6 = pino 7", "tip": "A faixa de cada diodo fica deste lado.", "nets": ["LIN6"], "comps": []}, "LIN7": {"title": "LIN7 · linha 7 da matriz", "tag": "row", "desc": "Botões de baixo (notas 31–35). A Control Surface puxa esta linha para LOW, uma de cada vez, e lê as colunas.", "ends": ["Pro Micro · pino 8", "Diodo do botão n31 (lado da faixa)", "Diodo do botão n32 (lado da faixa)", "Diodo do botão n33 (lado da faixa)", "Diodo do botão n34 (lado da faixa)", "Diodo do botão n35 (lado da faixa)"], "code": "NoteButtonMatrix: linha 7 = pino 8", "tip": "A faixa de cada diodo fica deste lado.", "nets": ["LIN7"], "comps": []}, "COL1": {"title": "COL1 · coluna 1 da matriz", "tag": "col", "desc": "Entrada com pull-up interno. Recebe um lado de cada botão da coluna 1.", "ends": ["Pro Micro · pino 9", "Botão do encoder 1 (SW)", "Botão n6", "Botão n11", "Botão n16", "Botão n21", "Botão n26", "Botão n31"], "code": "NoteButtonMatrix: coluna 1 = pino 9", "tip": "", "nets": ["COL1"], "comps": []}, "COL2": {"title": "COL2 · coluna 2 da matriz", "tag": "col", "desc": "Entrada com pull-up interno. Recebe um lado de cada botão da coluna 2.", "ends": ["Pro Micro · pino 10", "Botão do encoder 2 (SW)", "Botão n7", "Botão n12", "Botão n17", "Botão n22", "Botão n27", "Botão n32"], "code": "NoteButtonMatrix: coluna 2 = pino 10", "tip": "", "nets": ["COL2"], "comps": []}, "COL3": {"title": "COL3 · coluna 3 da matriz", "tag": "col", "desc": "Entrada com pull-up interno. Recebe um lado de cada botão da coluna 3.", "ends": ["Pro Micro · pino 14", "Botão do encoder 3 (SW)", "Botão n8", "Botão n13", "Botão n18", "Botão n23", "Botão n28", "Botão n33"], "code": "NoteButtonMatrix: coluna 3 = pino 14", "tip": "", "nets": ["COL3"], "comps": []}, "COL4": {"title": "COL4 · coluna 4 da matriz", "tag": "col", "desc": "Entrada com pull-up interno. Recebe um lado de cada botão da coluna 4.", "ends": ["Pro Micro · pino 15", "Botão do encoder 4 (SW)", "Botão n9", "Botão n14", "Botão n19", "Botão n24", "Botão n29", "Botão n34"], "code": "NoteButtonMatrix: coluna 4 = pino 15", "tip": "", "nets": ["COL4"], "comps": []}, "COL5": {"title": "COL5 · coluna 5 da matriz", "tag": "col", "desc": "Entrada com pull-up interno. Recebe um lado de cada botão da coluna 5.", "ends": ["Pro Micro · pino 16", "Botão do encoder 5 (SW)", "Botão n10", "Botão n15", "Botão n20", "Botão n25", "Botão n30", "Botão n35"], "code": "NoteButtonMatrix: coluna 5 = pino 16", "tip": "", "nets": ["COL5"], "comps": []}, "NC_RAW": {"title": "RAW · sem uso", "tag": "nc", "desc": "Entrada de alimentação de 6 a 12 V do regulador. Não é usada: tudo é alimentado pela USB.", "ends": ["Nada"], "code": "", "tip": "Não ligue 5 V aqui junto com a USB.", "nets": ["NC_RAW"], "comps": []}, "NC_RST": {"title": "RST · sem uso", "tag": "nc", "desc": "Reset do Pro Micro. Não precisa de ligação.", "ends": ["Nada (ou um botão para o GND)"], "code": "", "tip": "Encostar RST no GND duas vezes rápido entra no modo de gravação, útil se a placa sumir da USB.", "nets": ["NC_RST"], "comps": []}, "NC_FREE": {"title": "Entrada livre do MCP", "tag": "nc", "desc": "GPA5, GPA6, GPB5 e GPB6 estão livres.", "ends": ["Nada"], "code": "", "tip": "Dá para ligar mais 2 encoders aqui, um em GPA5/GPB5 e outro em GPA6/GPB6.", "nets": ["NC_FREE"], "comps": []}, "NC_OUT": {"title": "GPA7 / GPB7 · não usar como entrada", "tag": "nc", "desc": "Nas revisões atuais do MCP23017, a Microchip define esses pinos como somente saída.", "ends": ["Nada"], "code": "", "tip": "Podem acender um LED, mas não leem botões nem encoders de forma confiável.", "nets": ["NC_OUT"], "comps": []}, "NC_INT": {"title": "INTA / INTB · sem uso", "tag": "nc", "desc": "Saídas de interrupção do MCP. O código lê o chip por varredura, então não precisam de ligação.", "ends": ["Nada"], "code": "", "tip": "", "nets": ["NC_INT"], "comps": []}, "NC_NC": {"title": "NC · sem conexão", "tag": "nc", "desc": "Pino sem ligação interna no chip.", "ends": ["Nada"], "code": "", "tip": "", "nets": ["NC_NC"], "comps": []}, "BTN1": {"title": "Botão do encoder 1 · nota 1", "tag": "row", "desc": "O botão de apertar do encoder 1 ocupa a posição linha 1, coluna 1 da matriz.", "ends": ["Encoder 1 SW → COL1 (pino 9)", "Encoder 1 SW → diodo → LIN1 (pino 0)"], "code": "addresses[0][0] = 1", "tip": "Neste ponto o diodo é opcional: raramente se aperta encoder junto com pads.", "nets": ["LIN1", "COL1"], "comps": ["BTN1", "ENC1"]}, "BTN2": {"title": "Botão do encoder 2 · nota 2", "tag": "row", "desc": "O botão de apertar do encoder 2 ocupa a posição linha 1, coluna 2 da matriz.", "ends": ["Encoder 2 SW → COL2 (pino 10)", "Encoder 2 SW → diodo → LIN1 (pino 0)"], "code": "addresses[0][1] = 2", "tip": "Neste ponto o diodo é opcional: raramente se aperta encoder junto com pads.", "nets": ["LIN1", "COL2"], "comps": ["BTN2", "ENC2"]}, "BTN3": {"title": "Botão do encoder 3 · nota 3", "tag": "row", "desc": "O botão de apertar do encoder 3 ocupa a posição linha 1, coluna 3 da matriz.", "ends": ["Encoder 3 SW → COL3 (pino 14)", "Encoder 3 SW → diodo → LIN1 (pino 0)"], "code": "addresses[0][2] = 3", "tip": "Neste ponto o diodo é opcional: raramente se aperta encoder junto com pads.", "nets": ["LIN1", "COL3"], "comps": ["BTN3", "ENC3"]}, "BTN4": {"title": "Botão do encoder 4 · nota 4", "tag": "row", "desc": "O botão de apertar do encoder 4 ocupa a posição linha 1, coluna 4 da matriz.", "ends": ["Encoder 4 SW → COL4 (pino 15)", "Encoder 4 SW → diodo → LIN1 (pino 0)"], "code": "addresses[0][3] = 4", "tip": "Neste ponto o diodo é opcional: raramente se aperta encoder junto com pads.", "nets": ["LIN1", "COL4"], "comps": ["BTN4", "ENC4"]}, "BTN5": {"title": "Botão do encoder 5 · nota 5", "tag": "row", "desc": "O botão de apertar do encoder 5 ocupa a posição linha 1, coluna 5 da matriz.", "ends": ["Encoder 5 SW → COL5 (pino 16)", "Encoder 5 SW → diodo → LIN1 (pino 0)"], "code": "addresses[0][4] = 5", "tip": "Neste ponto o diodo é opcional: raramente se aperta encoder junto com pads.", "nets": ["LIN1", "COL5"], "comps": ["BTN5", "ENC5"]}, "BTN6": {"title": "Botão n6", "tag": "row", "desc": "Envia Note On 6 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL1 (pino 9)", "Outro lado → diodo 1N4148 → LIN2 (pino 1)"], "code": "addresses[1][0] = 6", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN2", "COL1"], "comps": ["BTN6"]}, "BTN7": {"title": "Botão n7", "tag": "row", "desc": "Envia Note On 7 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL2 (pino 10)", "Outro lado → diodo 1N4148 → LIN2 (pino 1)"], "code": "addresses[1][1] = 7", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN2", "COL2"], "comps": ["BTN7"]}, "BTN8": {"title": "Botão n8", "tag": "row", "desc": "Envia Note On 8 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL3 (pino 14)", "Outro lado → diodo 1N4148 → LIN2 (pino 1)"], "code": "addresses[1][2] = 8", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN2", "COL3"], "comps": ["BTN8"]}, "BTN9": {"title": "Botão n9", "tag": "row", "desc": "Envia Note On 9 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL4 (pino 15)", "Outro lado → diodo 1N4148 → LIN2 (pino 1)"], "code": "addresses[1][3] = 9", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN2", "COL4"], "comps": ["BTN9"]}, "BTN10": {"title": "Botão n10", "tag": "row", "desc": "Envia Note On 10 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL5 (pino 16)", "Outro lado → diodo 1N4148 → LIN2 (pino 1)"], "code": "addresses[1][4] = 10", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN2", "COL5"], "comps": ["BTN10"]}, "BTN11": {"title": "Botão n11", "tag": "row", "desc": "Envia Note On 11 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL1 (pino 9)", "Outro lado → diodo 1N4148 → LIN3 (pino 4)"], "code": "addresses[2][0] = 11", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN3", "COL1"], "comps": ["BTN11"]}, "BTN12": {"title": "Botão n12", "tag": "row", "desc": "Envia Note On 12 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL2 (pino 10)", "Outro lado → diodo 1N4148 → LIN3 (pino 4)"], "code": "addresses[2][1] = 12", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN3", "COL2"], "comps": ["BTN12"]}, "BTN13": {"title": "Botão n13", "tag": "row", "desc": "Envia Note On 13 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL3 (pino 14)", "Outro lado → diodo 1N4148 → LIN3 (pino 4)"], "code": "addresses[2][2] = 13", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN3", "COL3"], "comps": ["BTN13"]}, "BTN14": {"title": "Botão n14", "tag": "row", "desc": "Envia Note On 14 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL4 (pino 15)", "Outro lado → diodo 1N4148 → LIN3 (pino 4)"], "code": "addresses[2][3] = 14", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN3", "COL4"], "comps": ["BTN14"]}, "BTN15": {"title": "Botão n15", "tag": "row", "desc": "Envia Note On 15 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL5 (pino 16)", "Outro lado → diodo 1N4148 → LIN3 (pino 4)"], "code": "addresses[2][4] = 15", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN3", "COL5"], "comps": ["BTN15"]}, "BTN16": {"title": "Botão n16", "tag": "row", "desc": "Envia Note On 16 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL1 (pino 9)", "Outro lado → diodo 1N4148 → LIN4 (pino 5)"], "code": "addresses[3][0] = 16", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN4", "COL1"], "comps": ["BTN16"]}, "BTN17": {"title": "Botão n17", "tag": "row", "desc": "Envia Note On 17 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL2 (pino 10)", "Outro lado → diodo 1N4148 → LIN4 (pino 5)"], "code": "addresses[3][1] = 17", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN4", "COL2"], "comps": ["BTN17"]}, "BTN18": {"title": "Botão n18", "tag": "row", "desc": "Envia Note On 18 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL3 (pino 14)", "Outro lado → diodo 1N4148 → LIN4 (pino 5)"], "code": "addresses[3][2] = 18", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN4", "COL3"], "comps": ["BTN18"]}, "BTN19": {"title": "Botão n19", "tag": "row", "desc": "Envia Note On 19 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL4 (pino 15)", "Outro lado → diodo 1N4148 → LIN4 (pino 5)"], "code": "addresses[3][3] = 19", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN4", "COL4"], "comps": ["BTN19"]}, "BTN20": {"title": "Botão n20", "tag": "row", "desc": "Envia Note On 20 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL5 (pino 16)", "Outro lado → diodo 1N4148 → LIN4 (pino 5)"], "code": "addresses[3][4] = 20", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN4", "COL5"], "comps": ["BTN20"]}, "BTN21": {"title": "Botão n21", "tag": "row", "desc": "Envia Note On 21 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL1 (pino 9)", "Outro lado → diodo 1N4148 → LIN5 (pino 6)"], "code": "addresses[4][0] = 21", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN5", "COL1"], "comps": ["BTN21"]}, "BTN22": {"title": "Botão n22", "tag": "row", "desc": "Envia Note On 22 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL2 (pino 10)", "Outro lado → diodo 1N4148 → LIN5 (pino 6)"], "code": "addresses[4][1] = 22", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN5", "COL2"], "comps": ["BTN22"]}, "BTN23": {"title": "Botão n23", "tag": "row", "desc": "Envia Note On 23 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL3 (pino 14)", "Outro lado → diodo 1N4148 → LIN5 (pino 6)"], "code": "addresses[4][2] = 23", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN5", "COL3"], "comps": ["BTN23"]}, "BTN24": {"title": "Botão n24", "tag": "row", "desc": "Envia Note On 24 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL4 (pino 15)", "Outro lado → diodo 1N4148 → LIN5 (pino 6)"], "code": "addresses[4][3] = 24", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN5", "COL4"], "comps": ["BTN24"]}, "BTN25": {"title": "Botão n25", "tag": "row", "desc": "Envia Note On 25 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL5 (pino 16)", "Outro lado → diodo 1N4148 → LIN5 (pino 6)"], "code": "addresses[4][4] = 25", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN5", "COL5"], "comps": ["BTN25"]}, "BTN26": {"title": "Botão n26", "tag": "row", "desc": "Envia Note On 26 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL1 (pino 9)", "Outro lado → diodo 1N4148 → LIN6 (pino 7)"], "code": "addresses[5][0] = 26", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN6", "COL1"], "comps": ["BTN26"]}, "BTN27": {"title": "Botão n27", "tag": "row", "desc": "Envia Note On 27 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL2 (pino 10)", "Outro lado → diodo 1N4148 → LIN6 (pino 7)"], "code": "addresses[5][1] = 27", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN6", "COL2"], "comps": ["BTN27"]}, "BTN28": {"title": "Botão n28", "tag": "row", "desc": "Envia Note On 28 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL3 (pino 14)", "Outro lado → diodo 1N4148 → LIN6 (pino 7)"], "code": "addresses[5][2] = 28", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN6", "COL3"], "comps": ["BTN28"]}, "BTN29": {"title": "Botão n29", "tag": "row", "desc": "Envia Note On 29 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL4 (pino 15)", "Outro lado → diodo 1N4148 → LIN6 (pino 7)"], "code": "addresses[5][3] = 29", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN6", "COL4"], "comps": ["BTN29"]}, "BTN30": {"title": "Botão n30", "tag": "row", "desc": "Envia Note On 30 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL5 (pino 16)", "Outro lado → diodo 1N4148 → LIN6 (pino 7)"], "code": "addresses[5][4] = 30", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN6", "COL5"], "comps": ["BTN30"]}, "BTN31": {"title": "Botão n31", "tag": "row", "desc": "Envia Note On 31 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL1 (pino 9)", "Outro lado → diodo 1N4148 → LIN7 (pino 8)"], "code": "addresses[6][0] = 31", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN7", "COL1"], "comps": ["BTN31"]}, "BTN32": {"title": "Botão n32", "tag": "row", "desc": "Envia Note On 32 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL2 (pino 10)", "Outro lado → diodo 1N4148 → LIN7 (pino 8)"], "code": "addresses[6][1] = 32", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN7", "COL2"], "comps": ["BTN32"]}, "BTN33": {"title": "Botão n33", "tag": "row", "desc": "Envia Note On 33 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL3 (pino 14)", "Outro lado → diodo 1N4148 → LIN7 (pino 8)"], "code": "addresses[6][2] = 33", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN7", "COL3"], "comps": ["BTN33"]}, "BTN34": {"title": "Botão n34", "tag": "row", "desc": "Envia Note On 34 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL4 (pino 15)", "Outro lado → diodo 1N4148 → LIN7 (pino 8)"], "code": "addresses[6][3] = 34", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN7", "COL4"], "comps": ["BTN34"]}, "BTN35": {"title": "Botão n35", "tag": "row", "desc": "Envia Note On 35 com velocidade 127 ao apertar e Note Off ao soltar.", "ends": ["Um lado → COL5 (pino 16)", "Outro lado → diodo 1N4148 → LIN7 (pino 8)"], "code": "addresses[6][4] = 35", "tip": "A faixa do diodo fica do lado da linha.", "nets": ["LIN7", "COL5"], "comps": ["BTN35"]}, "ENC1": {"title": "Encoder 1", "tag": "enc", "desc": "Encoder EC11 com botão. Girar muda o CC 21 de 3 em 3; apertar envia a nota 1.", "ends": ["A → MCP23017 pino 21 (GPA0)", "B → MCP23017 pino 1 (GPB0)", "C (meio) → GND", "SW → COL1 (pino 9)", "SW → diodo → LIN1 (pino 0)"], "code": "ccNumber[0] = 21", "tip": "", "nets": ["E1A", "E1B"], "comps": ["ENC1", "BTN1"]}, "ENC2": {"title": "Encoder 2", "tag": "enc", "desc": "Encoder EC11 com botão. Girar muda o CC 22 de 3 em 3; apertar envia a nota 2.", "ends": ["A → MCP23017 pino 22 (GPA1)", "B → MCP23017 pino 2 (GPB1)", "C (meio) → GND", "SW → COL2 (pino 10)", "SW → diodo → LIN1 (pino 0)"], "code": "ccNumber[1] = 22", "tip": "", "nets": ["E2A", "E2B"], "comps": ["ENC2", "BTN2"]}, "ENC3": {"title": "Encoder 3", "tag": "enc", "desc": "Encoder EC11 com botão. Girar muda o CC 23 de 3 em 3; apertar envia a nota 3.", "ends": ["A → MCP23017 pino 23 (GPA2)", "B → MCP23017 pino 3 (GPB2)", "C (meio) → GND", "SW → COL3 (pino 14)", "SW → diodo → LIN1 (pino 0)"], "code": "ccNumber[2] = 23", "tip": "", "nets": ["E3A", "E3B"], "comps": ["ENC3", "BTN3"]}, "ENC4": {"title": "Encoder 4", "tag": "enc", "desc": "Encoder EC11 com botão. Girar muda o CC 24 de 3 em 3; apertar envia a nota 4.", "ends": ["A → MCP23017 pino 24 (GPA3)", "B → MCP23017 pino 4 (GPB3)", "C (meio) → GND", "SW → COL4 (pino 15)", "SW → diodo → LIN1 (pino 0)"], "code": "ccNumber[3] = 24", "tip": "", "nets": ["E4A", "E4B"], "comps": ["ENC4", "BTN4"]}, "ENC5": {"title": "Encoder 5", "tag": "enc", "desc": "Encoder EC11 com botão. Girar muda o CC 25 de 3 em 3; apertar envia a nota 5.", "ends": ["A → MCP23017 pino 25 (GPA4)", "B → MCP23017 pino 5 (GPB4)", "C (meio) → GND", "SW → COL5 (pino 16)", "SW → diodo → LIN1 (pino 0)"], "code": "ccNumber[4] = 25", "tip": "", "nets": ["E5A", "E5B"], "comps": ["ENC5", "BTN5"]}, "FAD1": {"title": "Fader 1", "tag": "ana", "desc": "Potenciômetro deslizante de 10 kΩ linear. Envia o CC 30.", "ends": ["Ponta de cima → VCC", "Cursor (meio) → A0 (pino 18)", "Ponta de baixo → GND"], "code": "pots[0]", "tip": "", "nets": ["FD1"], "comps": ["FAD1"]}, "FAD2": {"title": "Fader 2", "tag": "ana", "desc": "Potenciômetro deslizante de 10 kΩ linear. Envia o CC 31.", "ends": ["Ponta de cima → VCC", "Cursor (meio) → A1 (pino 19)", "Ponta de baixo → GND"], "code": "pots[1]", "tip": "", "nets": ["FD2"], "comps": ["FAD2"]}, "FAD3": {"title": "Fader 3", "tag": "ana", "desc": "Potenciômetro deslizante de 10 kΩ linear. Envia o CC 32.", "ends": ["Ponta de cima → VCC", "Cursor (meio) → A2 (pino 20)", "Ponta de baixo → GND"], "code": "pots[2]", "tip": "", "nets": ["FD3"], "comps": ["FAD3"]}, "FAD4": {"title": "Fader 4", "tag": "ana", "desc": "Potenciômetro deslizante de 10 kΩ linear. Envia o CC 33.", "ends": ["Ponta de cima → VCC", "Cursor (meio) → A3 (pino 21)", "Ponta de baixo → GND"], "code": "pots[3]", "tip": "", "nets": ["FD4"], "comps": ["FAD4"]}, "OLED": {"title": "Display OLED", "tag": "i2c", "desc": "Display 0,96\" de 128×64 no endereço 0x3C. Mostra os valores dos encoders e dos faders.", "ends": ["GND → GND", "VCC → VCC", "SCL → pino 3", "SDA → pino 2"], "code": "U8X8_SSD1306_128X64_NONAME_HW_I2C", "tip": "Se for de 1,3\" e a imagem sair deslocada, use a linha SH1106 do código.", "nets": ["SDA", "SCL"], "comps": ["OLED"]}, "PULLUP": {"title": "Pull-ups do I²C", "tag": "i2c", "desc": "Dois resistores de 4,7 kΩ, do SDA e do SCL para o VCC.", "ends": ["SDA → 4,7 kΩ → VCC", "SCL → 4,7 kΩ → VCC"], "code": "", "tip": "Só são necessários se o seu módulo OLED não tiver pull-up.", "nets": ["SDA", "SCL"], "comps": ["PULLUP"]}, "CAP": {"title": "Capacitor de desacoplamento", "tag": "vcc", "desc": "Capacitor cerâmico de 100 nF entre VCC e GND do MCP23017.", "ends": ["Um terminal → MCP pino 9 (VDD)", "Outro terminal → MCP pino 10 (VSS)"], "code": "", "tip": "Solde o mais perto possível do chip.", "nets": [], "comps": ["CAP"]}};
+const svg = document.getElementById('sch');
+const sheet = document.getElementById('sheet');
+const $ = id => document.getElementById(id);
+const TAGNAME = { i2c:'I²C', vcc:'Alimentação', gnd:'Terra', row:'Matriz · linha', col:'Matriz · coluna', ana:'Analógico', enc:'Encoder', nc:'Sem uso' };
+const narrow = () => matchMedia('(max-width:640px)').matches;
+
+function select(key, src, fromSvg, quiet) {
+  const d = INFO[key]; if (!d) return;
+  const nets = new Set(d.nets), comps = new Set(d.comps);
+  svg.classList.add('sel');
+  let first = null;
+  svg.querySelectorAll('.hit').forEach(el => {
+    const elNets = (el.dataset.net || '').split(' ').filter(Boolean);
+    const on = el.dataset.key === key || elNets.some(n => nets.has(n)) || comps.has(el.dataset.comp);
+    el.classList.toggle('hi', on);
+    if (on && !first) first = el;
+  });
+  document.querySelectorAll('.pb').forEach(b => {
+    b.classList.toggle('on', b.dataset.key === key || nets.has(b.dataset.key));
+    b.classList.toggle('cur', b.dataset.key === key && b.dataset.src === src);
+  });
+  document.querySelectorAll('.cb').forEach(b => b.classList.toggle('on', b.dataset.key === key));
+
+  $('i-src').textContent = src || 'Componente';
+  $('i-title').textContent = d.title;
+  const tag = $('i-tag'); tag.textContent = TAGNAME[d.tag] || ''; tag.className = 'tag t-' + d.tag;
+  $('i-desc').textContent = d.desc;
+  const ul = $('i-ends'); ul.replaceChildren(...d.ends.map(t => { const li = document.createElement('li'); li.textContent = t; return li; }));
+  $('g-code').hidden = !d.code; $('i-code').textContent = d.code;
+  $('i-tip').hidden = !d.tip; $('i-tip').textContent = d.tip;
+
+  if (!fromSvg && first) {
+    const r = first.getBoundingClientRect(), s = sheet.getBoundingClientRect();
+    sheet.scrollTo({ left: sheet.scrollLeft + (r.left - s.left) - s.width / 2 + r.width / 2, behavior: 'smooth' });
+  }
+  if (narrow() && !quiet) { $('info').hidden = false; document.body.classList.add('sheet-open'); }
+}
+
+function clearSel() {
+  svg.classList.remove('sel');
+  svg.querySelectorAll('.hit.hi').forEach(el => el.classList.remove('hi'));
+  document.querySelectorAll('.pb.on, .pb.cur, .cb.on').forEach(b => b.classList.remove('on', 'cur'));
+}
+
+svg.addEventListener('click', e => {
+  const g = e.target.closest('.hit'); if (!g) return;
+  select(g.dataset.key, g.dataset.src || '', true);
+});
+svg.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const g = e.target.closest('.hit'); if (!g) return;
+  e.preventDefault(); select(g.dataset.key, g.dataset.src || '', true);
+});
+document.querySelectorAll('.pb, .cb').forEach(b => b.addEventListener('click', () => select(b.dataset.key, b.dataset.src || '', false)));
+$('clearSel').addEventListener('click', clearSel);
+$('closeInfo').addEventListener('click', () => { $('info').hidden = true; document.body.classList.remove('sheet-open'); });
+
+
+(function () {
+  const boxes = [...document.querySelectorAll('.wires input')];
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem('montagem-checks') || '[]'); } catch (e) {}
+  const upd = () => {
+    document.querySelectorAll('.wires').forEach(tb => {
+      const bx = [...tb.querySelectorAll('input')], n = bx.filter(b => b.checked).length;
+      const el = document.getElementById('prog-' + tb.dataset.g);
+      if (el) el.textContent = n === bx.length ? 'Etapa conferida' : n + ' de ' + bx.length + ' conferidas';
+    });
+    const n = boxes.filter(b => b.checked).length;
+    document.getElementById('prog-all').textContent = n === boxes.length
+      ? 'Tudo conferido. Pode ligar a USB.' : n + ' de ' + boxes.length + ' ligações conferidas no total';
+    boxes.forEach(b => b.closest('tr').classList.toggle('done', b.checked));
+    try { localStorage.setItem('montagem-checks', JSON.stringify(boxes.filter(b => b.checked).map(b => b.dataset.w))); } catch (e) {}
+  };
+  boxes.forEach(b => { b.checked = saved.includes(b.dataset.w); b.addEventListener('change', upd); });
+  upd();
+})();
+
+select('SDA', 'Pro Micro · 2 · SDA', true, true);
+if (narrow()) $('info').hidden = true;
+</script>
+
+</body>
+</html>

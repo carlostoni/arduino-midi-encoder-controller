@@ -11,6 +11,36 @@ Programa para Windows que dá funções às teclas e aos encoders de um controla
   - O encoder volta a zero a cada detent (estado de repouso `11`) e tolera 1 transição perdida.
 - Pinos: encoders A={1,20,4,18}, B={2,21,3,19}; linhas da matriz {5,6,7,8,9}, colunas {15,14,16,10}. Só o pino 0 está livre.
 
+## Aparelho novo: 7x5 (23/10)
+- Firmware, esquema elétrico e guia de montagem em `firmware/ControladorMIDI_7x5/`.
+- Pro Micro + MCP23017 (I²C 0x20) + OLED SSD1306 128x64 (I²C 0x3C).
+- Painel (2º desenho do usuário, 23/10):
+  - à esquerda: o display em cima, 4 faders verticais e 4 botões redondos embaixo dos faders (`redondosNoLado`);
+  - à direita: 5 knobs numa fileira e 25 pads 5x5;
+  - tudo alinhado como no desenho: o display tem a altura do título + knobs, os faders a altura dos pads, e os botões redondos ficam na altura da última fileira de pads. É uma grade só (`.lado`/`.centro` com `display: contents`), e `--altura-pad` é medida em JS (`medirPad` + ResizeObserver). Na janela estreita (<760 px) o lado esquerdo vai para cima, sem alinhar;
+  - cada botão redondo tem a função **"Mudo de um fader"** (`tipo: "mudo_fader"`, `valor` = "cc:30".."cc:33"). O padrão é o fader de cima (`faderDeCima`). O servidor resolve em `_acao_mudo_fader`, que dá o mudo do que o fader controla, e o OSD acompanha. Na tela o botão mostra "🔇 F1" e fica vermelho quando o fader está mudo;
+  - o 5º botão redondo (nota 35) ficou dentro da caixa, desativado: `desativadas: [35]` no modelo (some da tela) e `NOTAS_DESATIVADAS` no servidor (ignorado).
+- O que cada parte manda (canal 1):
+  - knobs E1..E5 = CC 21..25 (A/B no MCP23017), com o botão de cada knob na linha 1 da matriz = notas 1..5;
+  - pads = notas 6..30; botões redondos = notas 31..34 (a 35 está desativada);
+  - faders F1..F4 = CC 30..33 (A0..A3, `CCPotentiometer`).
+- O próprio Arduino escreve no OLED E1..E5 e P1..P4 (0..127). O PC não manda nada para o display.
+- No programa, `config.modelo` escolhe o aparelho: `"original"` (padrão) ou `"7x5"`.
+  - Tudo o que depende do hardware fica em `MODELOS` no `index.html`: encoders, notas, grade, redondos, faders, display, ordem visual, nomes das posições na calibração e botões padrão.
+  - O seletor de modelo fica no topo. Trocar de modelo volta `layout` e `botoes` ao padrão daquele modelo. No 7x5, `calibrado` já fica true porque a fiação é documentada.
+  - Se chegar um sinal que só o 7x5 manda (CC 25, CC 30..33 ou nota 21..35) com o modelo "original", a tela oferece trocar.
+  - Faders: funções `TIPOS_FADER` (volume geral, de programa ou do microfone). Usam o mesmo caminho de volume dos knobs no servidor (qualquer CC com tipo em `TIPOS_VOLUME`) e aceitam "inverter o sentido" (`invertidos`).
+  - Os pads ficam na grade 5x5; as notas livres depois da grade (31..35) são os botões redondos (`ehRedondo`).
+  - A tela mostra uma imitação do OLED que acompanha os valores ao vivo.
+  - `teclas_invertidas` vale só para o modelo original; o servidor também confere isso.
+
+- **Dois programas separados** (pedido do usuário), mesmo código:
+  - `Controlador MIDI - Portatil\` = o original. Foi regerado a partir do commit `e41ca42` do GitHub (o mesmo de antes do 7x5), porta 8800.
+  - `Controlador MIDI 7x5 - Portatil\` = `portatil_7x5.spec`, que embute `edicoes/7x5/edicao.json` e o ícone próprio.
+  - `edicao.json`: `titulo` (nome da janela, da bandeja e do .exe), `porta` (8801) e `padrao` (vai por cima do `CONFIG_PADRAO`: modelo 7x5, layout, botões e o perfil inicial com mídia nos pads 6..9 e volume geral no fader 1).
+  - Com portas diferentes, os dois podem ficar abertos juntos. Cada um tem o seu `config.json`. Com os dois aparelhos plugados, escolha a entrada MIDI em cada um, porque "Automático" pega a primeira.
+  - Para gerar: `python -m PyInstaller portatil_7x5.spec --noconfirm --clean --distpath <tmp>\dist --workpath <tmp>\build` e copie `dist\Controlador MIDI 7x5\` para a pasta Portatil do 7x5.
+
 ## O programa
 - Para abrir: `Abrir Controlador MIDI.bat`. Ele roda `python controlador.py`, que abre uma janela pywebview (ou o navegador, se ela falhar) na porta **8800**.
 - Com `--sem-janela`, só sobe o servidor (usado nos testes).

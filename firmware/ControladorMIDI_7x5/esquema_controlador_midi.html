@@ -1,0 +1,1012 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Controlador MIDI 32U4</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Folha de esquema técnico: papel com grade, componentes em traço fino, redes por cor */
+:root {
+  --bg:#eef2f1; --paper:#fbfcfc; --fg:#17221e; --muted:#5d6d67; --line:#cfd9d5; --wire:#2a3732; --chip:#ffffff; --grid:#dde5e2;
+  --i2c:#5a3ec2; --i2c-bg:#ece7fd; --vcc:#b3311e; --vcc-bg:#fbe6e2; --gnd:#45514c; --gnd-bg:#e2e8e5;
+  --row:#0a7861; --row-bg:#dcf3ec; --col:#9f5806; --col-bg:#fbecd5; --ana:#1d5dac; --ana-bg:#dfe9fb; --enc:#a0316a; --enc-bg:#fbe3ef;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg:#0d1412; --paper:#121b18; --fg:#dbe5e1; --muted:#90a29b; --line:#2b3934; --wire:#b8c7c1; --chip:#17211e; --grid:#1c2824;
+  --i2c:#b5a3ff; --i2c-bg:#29224f; --vcc:#ff8b77; --vcc-bg:#3d1c16; --gnd:#aab7b2; --gnd-bg:#25302c;
+  --row:#52d7b4; --row-bg:#10362c; --col:#f2ab54; --col-bg:#3a2a10; --ana:#80b1f5; --ana-bg:#16294a; --enc:#f285b9; --enc-bg:#3c1a2c;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg:#0d1412; --paper:#121b18; --fg:#dbe5e1; --muted:#90a29b; --line:#2b3934; --wire:#b8c7c1; --chip:#17211e; --grid:#1c2824;
+  --i2c:#b5a3ff; --i2c-bg:#29224f; --vcc:#ff8b77; --vcc-bg:#3d1c16; --gnd:#aab7b2; --gnd-bg:#25302c;
+  --row:#52d7b4; --row-bg:#10362c; --col:#f2ab54; --col-bg:#3a2a10; --ana:#80b1f5; --ana-bg:#16294a; --enc:#f285b9; --enc-bg:#3c1a2c;
+  color-scheme: dark; }
+* { box-sizing:border-box }
+body { background:var(--bg); color:var(--fg); font-family:var(--f-body); font-size:15px; line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:28px 56px }
+.wrap { max-width:1180px; margin:0 auto; display:grid; gap:36px }
+header { display:grid; gap:10px }
+.eyebrow { font-family:var(--f-mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted) }
+h1 { font-family:var(--f-display); font-weight:600; font-size:clamp(30px,5vw,44px); line-height:1.05; margin:0; text-wrap:balance }
+h2 { font-family:var(--f-display); font-weight:600; font-size:22px; margin:0; text-wrap:balance }
+p { margin:0; max-width:68ch }
+.lead { color:var(--muted); font-size:16px }
+.specs { display:flex; flex-wrap:wrap; gap:6px 18px; font-family:var(--f-mono); font-size:13px; color:var(--fg) }
+.specs span b { font-weight:600 }
+section { display:grid; gap:14px; min-width:0 }
+.legend { display:flex; flex-wrap:wrap; gap:8px }
+.chip-net { display:inline-block; font-family:var(--f-mono); font-size:12px; font-weight:600; padding:1px 8px; border-radius:4px; border:1px solid; white-space:nowrap }
+.i2c { color:var(--i2c); background:var(--i2c-bg); border-color:var(--i2c) }
+.vcc { color:var(--vcc); background:var(--vcc-bg); border-color:var(--vcc) }
+.gnd { color:var(--gnd); background:var(--gnd-bg); border-color:var(--gnd) }
+.row { color:var(--row); background:var(--row-bg); border-color:var(--row) }
+.col { color:var(--col); background:var(--col-bg); border-color:var(--col) }
+.ana { color:var(--ana); background:var(--ana-bg); border-color:var(--ana) }
+.enc { color:var(--enc); background:var(--enc-bg); border-color:var(--enc) }
+.legend .chip-net { font-weight:400 }
+.rule { font-size:14px; color:var(--muted) }
+.rule strong { color:var(--fg); font-weight:600 }
+
+.sheet { overflow-x:auto; border:1px solid var(--line); border-radius:6px; background-color:var(--paper);
+  background-image:radial-gradient(var(--grid) 1px, transparent 1.2px); background-size:20px 20px }
+.sch { display:block; width:100%; min-width:1080px; height:auto }
+.sch text { font-family:var(--f-mono) }
+.w { stroke:var(--wire); stroke-width:1.5; fill:none; stroke-linecap:round }
+.w.bar, .w.plate { stroke-width:2.2 }
+.nc { stroke:var(--muted) }
+.jn { fill:var(--wire) }
+.chip { fill:var(--chip); stroke:var(--fg); stroke-width:1.5 }
+.screen { fill:var(--line) }
+.usb { fill:var(--line); stroke:var(--fg); stroke-width:1.2 }
+.notch { fill:var(--paper); stroke:var(--fg); stroke-width:1.2 }
+.ppad { fill:none; stroke:var(--muted) }
+.part { fill:var(--chip); stroke:var(--wire); stroke-width:1.5 }
+.dio, .arrowhead { fill:var(--wire) }
+.term { fill:var(--paper); stroke:var(--wire); stroke-width:1.3 }
+.knob { fill:var(--line); stroke:var(--fg); stroke-width:1.2 }
+.ghost { fill:none; stroke:var(--enc); stroke-dasharray:4 3 }
+.ghost-t { fill:var(--enc); font-size:11px }
+.pin { fill:var(--fg); font-size:12px }
+.pin.dim { fill:var(--muted) }
+.pnum, .sub, .note { fill:var(--muted); font-size:11px }
+.val { fill:var(--fg); font-size:11px }
+.lbl { fill:var(--fg); font-size:13px; font-weight:600 }
+.sch .ttl { font-family:var(--f-display); font-size:16px; font-weight:600; fill:var(--fg) }
+.flag polygon { stroke-width:1.2 }
+.flag text { font-size:11px; font-weight:600 }
+.n-i2c polygon { fill:var(--i2c-bg); stroke:var(--i2c) } .n-i2c text { fill:var(--i2c) }
+.n-vcc polygon { fill:var(--vcc-bg); stroke:var(--vcc) } .n-vcc text { fill:var(--vcc) }
+.n-gnd polygon { fill:var(--gnd-bg); stroke:var(--gnd) } .n-gnd text { fill:var(--gnd) }
+.n-row polygon { fill:var(--row-bg); stroke:var(--row) } .n-row text { fill:var(--row) }
+.n-col polygon { fill:var(--col-bg); stroke:var(--col) } .n-col text { fill:var(--col) }
+.n-ana polygon { fill:var(--ana-bg); stroke:var(--ana) } .n-ana text { fill:var(--ana) }
+.n-enc polygon { fill:var(--enc-bg); stroke:var(--enc) } .n-enc text { fill:var(--enc) }
+.hint { font-size:13px; color:var(--muted) }
+
+.two { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:36px; align-items:start }
+@media (max-width:860px) { .two { grid-template-columns:minmax(0,1fr) } }
+
+.panel { display:flex; gap:28px; padding:22px; border:1px solid var(--line); border-radius:10px; background:var(--paper); flex-wrap:wrap }
+.panel-left { display:grid; gap:14px; align-content:start }
+.oled { width:170px; height:62px; border-radius:4px; background:var(--fg); color:var(--paper); font-family:var(--f-mono); font-size:11px; padding:6px 8px; line-height:1.35 }
+.faders { display:flex; gap:16px }
+.fader { display:grid; justify-items:center; gap:4px; font-family:var(--f-mono); font-size:11px }
+.fader b { font-size:12px }
+.fader small, .p-enc small, .btn small { color:var(--muted); font-size:10.5px; white-space:nowrap }
+.track { position:relative; width:10px; height:170px; border-radius:5px; background:var(--line) }
+.cap { position:absolute; left:-9px; width:28px; height:14px; border-radius:3px; background:var(--ana); }
+.panel-right { display:grid; gap:10px; align-content:start; min-width:0 }
+.grid5 { display:grid; grid-template-columns:repeat(5, 50px); gap:8px }
+.p-enc { display:grid; justify-items:center; gap:2px; font-family:var(--f-mono); font-size:11px }
+.dial { width:30px; height:30px; border-radius:50%; border:2px solid var(--enc); background:var(--enc-bg) }
+.p-pad { height:40px; border-radius:6px; border:1.5px solid var(--row); background:var(--row-bg); display:grid; place-items:center;
+  font-family:var(--f-mono); font-size:11px; color:var(--row) }
+.btn { display:grid; justify-items:center; gap:3px; font-family:var(--f-mono) }
+.oval { width:28px; height:16px; border-radius:50%; border:1.5px solid var(--row); background:var(--row-bg) }
+
+ul.steps { margin:0; padding-left:20px; display:grid; gap:8px; max-width:68ch }
+.table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:8px; background:var(--paper) }
+table { border-collapse:collapse; width:100%; min-width:640px; font-size:13.5px }
+th, td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top }
+th { font-family:var(--f-mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:500 }
+tr:last-child td { border-bottom:0 }
+td:first-child { width:90px }
+td:last-child { color:var(--muted) }
+.bom { display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px 14px; font-size:14px; margin:0 }
+.bom dt { font-family:var(--f-mono); font-variant-numeric:tabular-nums; text-align:right; font-weight:600 }
+.bom dd { margin:0 }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Esquema elétrico · rev. 1</div>
+  <h1>Controlador MIDI 32U4</h1>
+  <p class="lead">Ligação completa do Arduino Pro Micro com um expansor MCP23017, display OLED, 4 faders, 5 encoders e uma matriz de 35 botões. Corresponde ao código <code>controlador_midi_7x5.ino</code>.</p>
+  <div class="specs"><span><b>18/18</b> pinos do Pro Micro em uso</span><span><b>10/14</b> entradas do MCP em uso</span><span><b>USB-MIDI</b> canal 1</span></div>
+</header>
+
+<section>
+  <h2>Esquema</h2>
+  <div class="legend">
+    <span class="chip-net i2c">SDA · SCL</span><span class="chip-net vcc">VCC 5 V</span><span class="chip-net gnd">GND</span>
+    <span class="chip-net enc">Encoders E1A…E5B</span><span class="chip-net ana">Faders FD1…FD4</span>
+    <span class="chip-net row">Linhas LIN1…LIN7</span><span class="chip-net col">Colunas COL1…COL5</span>
+  </div>
+  <p class="rule"><strong>Como ler:</strong> etiquetas com o mesmo nome são o mesmo fio. Todo <span class="chip-net col">COL3</span> se liga ao pino 14 do Pro Micro, todo <span class="chip-net vcc">VCC</span> ao VCC, e assim por diante. Pinos marcados com × ficam desligados.</p>
+  <div class="sheet"><svg class="sch" viewBox="0 0 1400 1130" role="img" aria-labelledby="sch-t">
+<title id="sch-t">Esquema elétrico completo do controlador MIDI</title>
+<text class="ttl" x="960" y="26" text-anchor="start" dominant-baseline="central">Alimentação e I²C</text>
+<g class="flag n-vcc"><polygon points="990.0,66.0 983.0,58.0 952.0,58.0 952.0,74.0 983.0,74.0"/><text x="967.5" y="66" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="990" y1="66" x2="1010" y2="66"/>
+<rect class="part" x="1010" y="60" width="50" height="12" rx="2"/>
+<line class="w" x1="1060" y1="66" x2="1080" y2="66"/>
+<g class="flag n-i2c"><polygon points="1080.0,66.0 1087.0,58.0 1118.0,58.0 1118.0,74.0 1087.0,74.0"/><text x="1102.5" y="66" text-anchor="middle" dominant-baseline="central">SDA</text></g>
+<text class="val" x="1035" y="51" text-anchor="middle" dominant-baseline="central">4,7 kΩ</text>
+<g class="flag n-vcc"><polygon points="990.0,100.0 983.0,92.0 952.0,92.0 952.0,108.0 983.0,108.0"/><text x="967.5" y="100" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="990" y1="100" x2="1010" y2="100"/>
+<rect class="part" x="1010" y="94" width="50" height="12" rx="2"/>
+<line class="w" x1="1060" y1="100" x2="1080" y2="100"/>
+<g class="flag n-i2c"><polygon points="1080.0,100.0 1087.0,92.0 1118.0,92.0 1118.0,108.0 1087.0,108.0"/><text x="1102.5" y="100" text-anchor="middle" dominant-baseline="central">SCL</text></g>
+<text class="val" x="1035" y="85" text-anchor="middle" dominant-baseline="central">4,7 kΩ</text>
+<text class="note" x="960" y="124" text-anchor="start" dominant-baseline="central">Pull-ups opcionais: muitos módulos OLED já trazem.</text>
+<g class="flag n-vcc"><polygon points="1210.0,80.0 1203.0,72.0 1172.0,72.0 1172.0,88.0 1203.0,88.0"/><text x="1187.5" y="80" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="1210" y1="80" x2="1250" y2="80"/>
+<line class="w plate" x1="1250" y1="68" x2="1250" y2="92"/>
+<line class="w plate" x1="1258" y1="68" x2="1258" y2="92"/>
+<line class="w" x1="1258" y1="80" x2="1290" y2="80"/>
+<g class="flag n-gnd"><polygon points="1290.0,80.0 1297.0,72.0 1328.0,72.0 1328.0,88.0 1297.0,88.0"/><text x="1312.5" y="80" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="val" x="1254" y="56" text-anchor="middle" dominant-baseline="central">100 nF</text>
+<text class="note" x="1180" y="106" text-anchor="start" dominant-baseline="central">Junto aos pinos 9 e 10 do MCP.</text>
+<text class="ttl" x="40" y="22" text-anchor="start" dominant-baseline="central">OLED 0,96&quot; I²C · 0x3C</text>
+<rect class="chip" x="40" y="38" width="140" height="88" rx="4"/>
+<rect class="screen" x="52" y="50" width="96" height="64" rx="2"/>
+<text class="pin" x="176" y="52" text-anchor="end" dominant-baseline="central">GND</text>
+<line class="w" x1="180" y1="52" x2="206" y2="52"/>
+<g class="flag n-gnd"><polygon points="206.0,52.0 213.0,44.0 244.0,44.0 244.0,60.0 213.0,60.0"/><text x="228.5" y="52" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="pin" x="176" y="72" text-anchor="end" dominant-baseline="central">VCC</text>
+<line class="w" x1="180" y1="72" x2="206" y2="72"/>
+<g class="flag n-vcc"><polygon points="206.0,72.0 213.0,64.0 244.0,64.0 244.0,80.0 213.0,80.0"/><text x="228.5" y="72" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<text class="pin" x="176" y="92" text-anchor="end" dominant-baseline="central">SCL</text>
+<line class="w" x1="180" y1="92" x2="206" y2="92"/>
+<g class="flag n-i2c"><polygon points="206.0,92.0 213.0,84.0 244.0,84.0 244.0,100.0 213.0,100.0"/><text x="228.5" y="92" text-anchor="middle" dominant-baseline="central">SCL</text></g>
+<text class="pin" x="176" y="112" text-anchor="end" dominant-baseline="central">SDA</text>
+<line class="w" x1="180" y1="112" x2="206" y2="112"/>
+<g class="flag n-i2c"><polygon points="206.0,112.0 213.0,104.0 244.0,104.0 244.0,120.0 213.0,120.0"/><text x="228.5" y="112" text-anchor="middle" dominant-baseline="central">SDA</text></g>
+<text class="ttl" x="250" y="132" text-anchor="start" dominant-baseline="central">U2 · MCP23017 (DIP-28)</text>
+<text class="sub" x="250" y="148" text-anchor="start" dominant-baseline="central">Endereço 0x20</text>
+<rect class="chip" x="250" y="162" width="160" height="456" rx="4"/>
+<path class="notch" d="M318.0 162 a12 12 0 0 0 24 0"/>
+<text class="pnum" x="258" y="200" text-anchor="start" dominant-baseline="central">1</text>
+<text class="pin" x="278" y="200" text-anchor="start" dominant-baseline="central">GPB0</text>
+<line class="w" x1="216" y1="200" x2="250" y2="200"/>
+<g class="flag n-enc"><polygon points="216.0,200.0 209.0,192.0 178.0,192.0 178.0,208.0 209.0,208.0"/><text x="193.5" y="200" text-anchor="middle" dominant-baseline="central">E1B</text></g>
+<text class="pnum" x="258" y="230" text-anchor="start" dominant-baseline="central">2</text>
+<text class="pin" x="278" y="230" text-anchor="start" dominant-baseline="central">GPB1</text>
+<line class="w" x1="216" y1="230" x2="250" y2="230"/>
+<g class="flag n-enc"><polygon points="216.0,230.0 209.0,222.0 178.0,222.0 178.0,238.0 209.0,238.0"/><text x="193.5" y="230" text-anchor="middle" dominant-baseline="central">E2B</text></g>
+<text class="pnum" x="258" y="260" text-anchor="start" dominant-baseline="central">3</text>
+<text class="pin" x="278" y="260" text-anchor="start" dominant-baseline="central">GPB2</text>
+<line class="w" x1="216" y1="260" x2="250" y2="260"/>
+<g class="flag n-enc"><polygon points="216.0,260.0 209.0,252.0 178.0,252.0 178.0,268.0 209.0,268.0"/><text x="193.5" y="260" text-anchor="middle" dominant-baseline="central">E3B</text></g>
+<text class="pnum" x="258" y="290" text-anchor="start" dominant-baseline="central">4</text>
+<text class="pin" x="278" y="290" text-anchor="start" dominant-baseline="central">GPB3</text>
+<line class="w" x1="216" y1="290" x2="250" y2="290"/>
+<g class="flag n-enc"><polygon points="216.0,290.0 209.0,282.0 178.0,282.0 178.0,298.0 209.0,298.0"/><text x="193.5" y="290" text-anchor="middle" dominant-baseline="central">E4B</text></g>
+<text class="pnum" x="258" y="320" text-anchor="start" dominant-baseline="central">5</text>
+<text class="pin" x="278" y="320" text-anchor="start" dominant-baseline="central">GPB4</text>
+<line class="w" x1="216" y1="320" x2="250" y2="320"/>
+<g class="flag n-enc"><polygon points="216.0,320.0 209.0,312.0 178.0,312.0 178.0,328.0 209.0,328.0"/><text x="193.5" y="320" text-anchor="middle" dominant-baseline="central">E5B</text></g>
+<text class="pnum" x="258" y="350" text-anchor="start" dominant-baseline="central">6</text>
+<text class="pin dim" x="278" y="350" text-anchor="start" dominant-baseline="central">GPB5</text>
+<line class="w" x1="216" y1="350" x2="250" y2="350"/>
+<path class="w nc" d="M212 346L220 354M212 354L220 346"/>
+<text class="pnum" x="258" y="380" text-anchor="start" dominant-baseline="central">7</text>
+<text class="pin dim" x="278" y="380" text-anchor="start" dominant-baseline="central">GPB6</text>
+<line class="w" x1="216" y1="380" x2="250" y2="380"/>
+<path class="w nc" d="M212 376L220 384M212 384L220 376"/>
+<text class="pnum" x="258" y="410" text-anchor="start" dominant-baseline="central">8</text>
+<text class="pin dim" x="278" y="410" text-anchor="start" dominant-baseline="central">GPB7</text>
+<line class="w" x1="216" y1="410" x2="250" y2="410"/>
+<path class="w nc" d="M212 406L220 414M212 414L220 406"/>
+<text class="pnum" x="258" y="440" text-anchor="start" dominant-baseline="central">9</text>
+<text class="pin" x="278" y="440" text-anchor="start" dominant-baseline="central">VDD</text>
+<line class="w" x1="216" y1="440" x2="250" y2="440"/>
+<g class="flag n-vcc"><polygon points="216.0,440.0 209.0,432.0 178.0,432.0 178.0,448.0 209.0,448.0"/><text x="193.5" y="440" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<text class="pnum" x="258" y="470" text-anchor="start" dominant-baseline="central">10</text>
+<text class="pin" x="278" y="470" text-anchor="start" dominant-baseline="central">VSS</text>
+<line class="w" x1="216" y1="470" x2="250" y2="470"/>
+<g class="flag n-gnd"><polygon points="216.0,470.0 209.0,462.0 178.0,462.0 178.0,478.0 209.0,478.0"/><text x="193.5" y="470" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="pnum" x="258" y="500" text-anchor="start" dominant-baseline="central">11</text>
+<text class="pin dim" x="278" y="500" text-anchor="start" dominant-baseline="central">NC</text>
+<line class="w" x1="216" y1="500" x2="250" y2="500"/>
+<path class="w nc" d="M212 496L220 504M212 504L220 496"/>
+<text class="pnum" x="258" y="530" text-anchor="start" dominant-baseline="central">12</text>
+<text class="pin" x="278" y="530" text-anchor="start" dominant-baseline="central">SCL</text>
+<line class="w" x1="216" y1="530" x2="250" y2="530"/>
+<g class="flag n-i2c"><polygon points="216.0,530.0 209.0,522.0 178.0,522.0 178.0,538.0 209.0,538.0"/><text x="193.5" y="530" text-anchor="middle" dominant-baseline="central">SCL</text></g>
+<text class="pnum" x="258" y="560" text-anchor="start" dominant-baseline="central">13</text>
+<text class="pin" x="278" y="560" text-anchor="start" dominant-baseline="central">SDA</text>
+<line class="w" x1="216" y1="560" x2="250" y2="560"/>
+<g class="flag n-i2c"><polygon points="216.0,560.0 209.0,552.0 178.0,552.0 178.0,568.0 209.0,568.0"/><text x="193.5" y="560" text-anchor="middle" dominant-baseline="central">SDA</text></g>
+<text class="pnum" x="258" y="590" text-anchor="start" dominant-baseline="central">14</text>
+<text class="pin dim" x="278" y="590" text-anchor="start" dominant-baseline="central">NC</text>
+<line class="w" x1="216" y1="590" x2="250" y2="590"/>
+<path class="w nc" d="M212 586L220 594M212 594L220 586"/>
+<text class="pnum" x="402" y="200" text-anchor="end" dominant-baseline="central">28</text>
+<text class="pin dim" x="382" y="200" text-anchor="end" dominant-baseline="central">GPA7</text>
+<line class="w" x1="410" y1="200" x2="444" y2="200"/>
+<path class="w nc" d="M440 196L448 204M440 204L448 196"/>
+<text class="pnum" x="402" y="230" text-anchor="end" dominant-baseline="central">27</text>
+<text class="pin dim" x="382" y="230" text-anchor="end" dominant-baseline="central">GPA6</text>
+<line class="w" x1="410" y1="230" x2="444" y2="230"/>
+<path class="w nc" d="M440 226L448 234M440 234L448 226"/>
+<text class="pnum" x="402" y="260" text-anchor="end" dominant-baseline="central">26</text>
+<text class="pin dim" x="382" y="260" text-anchor="end" dominant-baseline="central">GPA5</text>
+<line class="w" x1="410" y1="260" x2="444" y2="260"/>
+<path class="w nc" d="M440 256L448 264M440 264L448 256"/>
+<text class="pnum" x="402" y="290" text-anchor="end" dominant-baseline="central">25</text>
+<text class="pin" x="382" y="290" text-anchor="end" dominant-baseline="central">GPA4</text>
+<line class="w" x1="410" y1="290" x2="444" y2="290"/>
+<g class="flag n-enc"><polygon points="444.0,290.0 451.0,282.0 482.0,282.0 482.0,298.0 451.0,298.0"/><text x="466.5" y="290" text-anchor="middle" dominant-baseline="central">E5A</text></g>
+<text class="pnum" x="402" y="320" text-anchor="end" dominant-baseline="central">24</text>
+<text class="pin" x="382" y="320" text-anchor="end" dominant-baseline="central">GPA3</text>
+<line class="w" x1="410" y1="320" x2="444" y2="320"/>
+<g class="flag n-enc"><polygon points="444.0,320.0 451.0,312.0 482.0,312.0 482.0,328.0 451.0,328.0"/><text x="466.5" y="320" text-anchor="middle" dominant-baseline="central">E4A</text></g>
+<text class="pnum" x="402" y="350" text-anchor="end" dominant-baseline="central">23</text>
+<text class="pin" x="382" y="350" text-anchor="end" dominant-baseline="central">GPA2</text>
+<line class="w" x1="410" y1="350" x2="444" y2="350"/>
+<g class="flag n-enc"><polygon points="444.0,350.0 451.0,342.0 482.0,342.0 482.0,358.0 451.0,358.0"/><text x="466.5" y="350" text-anchor="middle" dominant-baseline="central">E3A</text></g>
+<text class="pnum" x="402" y="380" text-anchor="end" dominant-baseline="central">22</text>
+<text class="pin" x="382" y="380" text-anchor="end" dominant-baseline="central">GPA1</text>
+<line class="w" x1="410" y1="380" x2="444" y2="380"/>
+<g class="flag n-enc"><polygon points="444.0,380.0 451.0,372.0 482.0,372.0 482.0,388.0 451.0,388.0"/><text x="466.5" y="380" text-anchor="middle" dominant-baseline="central">E2A</text></g>
+<text class="pnum" x="402" y="410" text-anchor="end" dominant-baseline="central">21</text>
+<text class="pin" x="382" y="410" text-anchor="end" dominant-baseline="central">GPA0</text>
+<line class="w" x1="410" y1="410" x2="444" y2="410"/>
+<g class="flag n-enc"><polygon points="444.0,410.0 451.0,402.0 482.0,402.0 482.0,418.0 451.0,418.0"/><text x="466.5" y="410" text-anchor="middle" dominant-baseline="central">E1A</text></g>
+<text class="pnum" x="402" y="440" text-anchor="end" dominant-baseline="central">20</text>
+<text class="pin dim" x="382" y="440" text-anchor="end" dominant-baseline="central">INTA</text>
+<line class="w" x1="410" y1="440" x2="444" y2="440"/>
+<path class="w nc" d="M440 436L448 444M440 444L448 436"/>
+<text class="pnum" x="402" y="470" text-anchor="end" dominant-baseline="central">19</text>
+<text class="pin dim" x="382" y="470" text-anchor="end" dominant-baseline="central">INTB</text>
+<line class="w" x1="410" y1="470" x2="444" y2="470"/>
+<path class="w nc" d="M440 466L448 474M440 474L448 466"/>
+<text class="pnum" x="402" y="500" text-anchor="end" dominant-baseline="central">18</text>
+<text class="pin" x="382" y="500" text-anchor="end" dominant-baseline="central">RESET</text>
+<line class="w" x1="410" y1="500" x2="444" y2="500"/>
+<g class="flag n-vcc"><polygon points="444.0,500.0 451.0,492.0 482.0,492.0 482.0,508.0 451.0,508.0"/><text x="466.5" y="500" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<text class="pnum" x="402" y="530" text-anchor="end" dominant-baseline="central">17</text>
+<text class="pin" x="382" y="530" text-anchor="end" dominant-baseline="central">A2</text>
+<line class="w" x1="410" y1="530" x2="444" y2="530"/>
+<g class="flag n-gnd"><polygon points="444.0,530.0 451.0,522.0 482.0,522.0 482.0,538.0 451.0,538.0"/><text x="466.5" y="530" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="pnum" x="402" y="560" text-anchor="end" dominant-baseline="central">16</text>
+<text class="pin" x="382" y="560" text-anchor="end" dominant-baseline="central">A1</text>
+<line class="w" x1="410" y1="560" x2="444" y2="560"/>
+<g class="flag n-gnd"><polygon points="444.0,560.0 451.0,552.0 482.0,552.0 482.0,568.0 451.0,568.0"/><text x="466.5" y="560" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="pnum" x="402" y="590" text-anchor="end" dominant-baseline="central">15</text>
+<text class="pin" x="382" y="590" text-anchor="end" dominant-baseline="central">A0</text>
+<line class="w" x1="410" y1="590" x2="444" y2="590"/>
+<g class="flag n-gnd"><polygon points="444.0,590.0 451.0,582.0 482.0,582.0 482.0,598.0 451.0,598.0"/><text x="466.5" y="590" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="ttl" x="660" y="108" text-anchor="start" dominant-baseline="central">U1 · Arduino Pro Micro</text>
+<text class="sub" x="660" y="124" text-anchor="start" dominant-baseline="central">ATmega32U4 · 5 V</text>
+<rect class="usb" x="715.0" y="138" width="60" height="22" rx="3"/>
+<text class="pnum" x="745.0" y="149" text-anchor="middle" dominant-baseline="central">USB</text>
+<rect class="chip" x="660" y="160" width="170" height="462" rx="6"/>
+<circle class="ppad" cx="670" cy="204" r="4"/>
+<text class="pin" x="680" y="204" text-anchor="start" dominant-baseline="central">TX0 · 1</text>
+<line class="w" x1="620" y1="204" x2="660" y2="204"/>
+<g class="flag n-row"><polygon points="620.0,204.0 613.0,196.0 574.0,196.0 574.0,212.0 613.0,212.0"/><text x="593.5" y="204" text-anchor="middle" dominant-baseline="central">LIN2</text></g>
+<circle class="ppad" cx="670" cy="238" r="4"/>
+<text class="pin" x="680" y="238" text-anchor="start" dominant-baseline="central">RX1 · 0</text>
+<line class="w" x1="620" y1="238" x2="660" y2="238"/>
+<g class="flag n-row"><polygon points="620.0,238.0 613.0,230.0 574.0,230.0 574.0,246.0 613.0,246.0"/><text x="593.5" y="238" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+<circle class="ppad" cx="670" cy="272" r="4"/>
+<text class="pin" x="680" y="272" text-anchor="start" dominant-baseline="central">GND</text>
+<line class="w" x1="620" y1="272" x2="660" y2="272"/>
+<g class="flag n-gnd"><polygon points="620.0,272.0 613.0,264.0 582.0,264.0 582.0,280.0 613.0,280.0"/><text x="597.5" y="272" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<circle class="ppad" cx="670" cy="306" r="4"/>
+<text class="pin" x="680" y="306" text-anchor="start" dominant-baseline="central">GND</text>
+<line class="w" x1="620" y1="306" x2="660" y2="306"/>
+<g class="flag n-gnd"><polygon points="620.0,306.0 613.0,298.0 582.0,298.0 582.0,314.0 613.0,314.0"/><text x="597.5" y="306" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<circle class="ppad" cx="670" cy="340" r="4"/>
+<text class="pin" x="680" y="340" text-anchor="start" dominant-baseline="central">2 · SDA</text>
+<line class="w" x1="620" y1="340" x2="660" y2="340"/>
+<g class="flag n-i2c"><polygon points="620.0,340.0 613.0,332.0 582.0,332.0 582.0,348.0 613.0,348.0"/><text x="597.5" y="340" text-anchor="middle" dominant-baseline="central">SDA</text></g>
+<circle class="ppad" cx="670" cy="374" r="4"/>
+<text class="pin" x="680" y="374" text-anchor="start" dominant-baseline="central">3 · SCL</text>
+<line class="w" x1="620" y1="374" x2="660" y2="374"/>
+<g class="flag n-i2c"><polygon points="620.0,374.0 613.0,366.0 582.0,366.0 582.0,382.0 613.0,382.0"/><text x="597.5" y="374" text-anchor="middle" dominant-baseline="central">SCL</text></g>
+<circle class="ppad" cx="670" cy="408" r="4"/>
+<text class="pin" x="680" y="408" text-anchor="start" dominant-baseline="central">4</text>
+<line class="w" x1="620" y1="408" x2="660" y2="408"/>
+<g class="flag n-row"><polygon points="620.0,408.0 613.0,400.0 574.0,400.0 574.0,416.0 613.0,416.0"/><text x="593.5" y="408" text-anchor="middle" dominant-baseline="central">LIN3</text></g>
+<circle class="ppad" cx="670" cy="442" r="4"/>
+<text class="pin" x="680" y="442" text-anchor="start" dominant-baseline="central">5</text>
+<line class="w" x1="620" y1="442" x2="660" y2="442"/>
+<g class="flag n-row"><polygon points="620.0,442.0 613.0,434.0 574.0,434.0 574.0,450.0 613.0,450.0"/><text x="593.5" y="442" text-anchor="middle" dominant-baseline="central">LIN4</text></g>
+<circle class="ppad" cx="670" cy="476" r="4"/>
+<text class="pin" x="680" y="476" text-anchor="start" dominant-baseline="central">6</text>
+<line class="w" x1="620" y1="476" x2="660" y2="476"/>
+<g class="flag n-row"><polygon points="620.0,476.0 613.0,468.0 574.0,468.0 574.0,484.0 613.0,484.0"/><text x="593.5" y="476" text-anchor="middle" dominant-baseline="central">LIN5</text></g>
+<circle class="ppad" cx="670" cy="510" r="4"/>
+<text class="pin" x="680" y="510" text-anchor="start" dominant-baseline="central">7</text>
+<line class="w" x1="620" y1="510" x2="660" y2="510"/>
+<g class="flag n-row"><polygon points="620.0,510.0 613.0,502.0 574.0,502.0 574.0,518.0 613.0,518.0"/><text x="593.5" y="510" text-anchor="middle" dominant-baseline="central">LIN6</text></g>
+<circle class="ppad" cx="670" cy="544" r="4"/>
+<text class="pin" x="680" y="544" text-anchor="start" dominant-baseline="central">8</text>
+<line class="w" x1="620" y1="544" x2="660" y2="544"/>
+<g class="flag n-row"><polygon points="620.0,544.0 613.0,536.0 574.0,536.0 574.0,552.0 613.0,552.0"/><text x="593.5" y="544" text-anchor="middle" dominant-baseline="central">LIN7</text></g>
+<circle class="ppad" cx="670" cy="578" r="4"/>
+<text class="pin" x="680" y="578" text-anchor="start" dominant-baseline="central">9</text>
+<line class="w" x1="620" y1="578" x2="660" y2="578"/>
+<g class="flag n-col"><polygon points="620.0,578.0 613.0,570.0 574.0,570.0 574.0,586.0 613.0,586.0"/><text x="593.5" y="578" text-anchor="middle" dominant-baseline="central">COL1</text></g>
+<circle class="ppad" cx="820" cy="204" r="4"/>
+<text class="pin dim" x="810" y="204" text-anchor="end" dominant-baseline="central">RAW</text>
+<line class="w" x1="830" y1="204" x2="870" y2="204"/>
+<path class="w nc" d="M866 200L874 208M866 208L874 200"/>
+<circle class="ppad" cx="820" cy="238" r="4"/>
+<text class="pin" x="810" y="238" text-anchor="end" dominant-baseline="central">GND</text>
+<line class="w" x1="830" y1="238" x2="870" y2="238"/>
+<g class="flag n-gnd"><polygon points="870.0,238.0 877.0,230.0 908.0,230.0 908.0,246.0 877.0,246.0"/><text x="892.5" y="238" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<circle class="ppad" cx="820" cy="272" r="4"/>
+<text class="pin dim" x="810" y="272" text-anchor="end" dominant-baseline="central">RST</text>
+<line class="w" x1="830" y1="272" x2="870" y2="272"/>
+<path class="w nc" d="M866 268L874 276M866 276L874 268"/>
+<circle class="ppad" cx="820" cy="306" r="4"/>
+<text class="pin" x="810" y="306" text-anchor="end" dominant-baseline="central">VCC</text>
+<line class="w" x1="830" y1="306" x2="870" y2="306"/>
+<g class="flag n-vcc"><polygon points="870.0,306.0 877.0,298.0 908.0,298.0 908.0,314.0 877.0,314.0"/><text x="892.5" y="306" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<circle class="ppad" cx="820" cy="340" r="4"/>
+<text class="pin" x="810" y="340" text-anchor="end" dominant-baseline="central">A3 · 21</text>
+<line class="w" x1="830" y1="340" x2="870" y2="340"/>
+<g class="flag n-ana"><polygon points="870.0,340.0 877.0,332.0 908.0,332.0 908.0,348.0 877.0,348.0"/><text x="892.5" y="340" text-anchor="middle" dominant-baseline="central">FD4</text></g>
+<circle class="ppad" cx="820" cy="374" r="4"/>
+<text class="pin" x="810" y="374" text-anchor="end" dominant-baseline="central">A2 · 20</text>
+<line class="w" x1="830" y1="374" x2="870" y2="374"/>
+<g class="flag n-ana"><polygon points="870.0,374.0 877.0,366.0 908.0,366.0 908.0,382.0 877.0,382.0"/><text x="892.5" y="374" text-anchor="middle" dominant-baseline="central">FD3</text></g>
+<circle class="ppad" cx="820" cy="408" r="4"/>
+<text class="pin" x="810" y="408" text-anchor="end" dominant-baseline="central">A1 · 19</text>
+<line class="w" x1="830" y1="408" x2="870" y2="408"/>
+<g class="flag n-ana"><polygon points="870.0,408.0 877.0,400.0 908.0,400.0 908.0,416.0 877.0,416.0"/><text x="892.5" y="408" text-anchor="middle" dominant-baseline="central">FD2</text></g>
+<circle class="ppad" cx="820" cy="442" r="4"/>
+<text class="pin" x="810" y="442" text-anchor="end" dominant-baseline="central">A0 · 18</text>
+<line class="w" x1="830" y1="442" x2="870" y2="442"/>
+<g class="flag n-ana"><polygon points="870.0,442.0 877.0,434.0 908.0,434.0 908.0,450.0 877.0,450.0"/><text x="892.5" y="442" text-anchor="middle" dominant-baseline="central">FD1</text></g>
+<circle class="ppad" cx="820" cy="476" r="4"/>
+<text class="pin" x="810" y="476" text-anchor="end" dominant-baseline="central">15</text>
+<line class="w" x1="830" y1="476" x2="870" y2="476"/>
+<g class="flag n-col"><polygon points="870.0,476.0 877.0,468.0 916.0,468.0 916.0,484.0 877.0,484.0"/><text x="896.5" y="476" text-anchor="middle" dominant-baseline="central">COL4</text></g>
+<circle class="ppad" cx="820" cy="510" r="4"/>
+<text class="pin" x="810" y="510" text-anchor="end" dominant-baseline="central">14</text>
+<line class="w" x1="830" y1="510" x2="870" y2="510"/>
+<g class="flag n-col"><polygon points="870.0,510.0 877.0,502.0 916.0,502.0 916.0,518.0 877.0,518.0"/><text x="896.5" y="510" text-anchor="middle" dominant-baseline="central">COL3</text></g>
+<circle class="ppad" cx="820" cy="544" r="4"/>
+<text class="pin" x="810" y="544" text-anchor="end" dominant-baseline="central">16</text>
+<line class="w" x1="830" y1="544" x2="870" y2="544"/>
+<g class="flag n-col"><polygon points="870.0,544.0 877.0,536.0 916.0,536.0 916.0,552.0 877.0,552.0"/><text x="896.5" y="544" text-anchor="middle" dominant-baseline="central">COL5</text></g>
+<circle class="ppad" cx="820" cy="578" r="4"/>
+<text class="pin" x="810" y="578" text-anchor="end" dominant-baseline="central">10</text>
+<line class="w" x1="830" y1="578" x2="870" y2="578"/>
+<g class="flag n-col"><polygon points="870.0,578.0 877.0,570.0 916.0,570.0 916.0,586.0 877.0,586.0"/><text x="896.5" y="578" text-anchor="middle" dominant-baseline="central">COL2</text></g>
+<text class="ttl" x="960" y="168" text-anchor="start" dominant-baseline="central">Faders 10 kΩ lineares</text>
+<text class="sub" x="960" y="184" text-anchor="start" dominant-baseline="central">Cursor (meio) vai na entrada analógica</text>
+<g class="flag n-vcc"><polygon points="1000.0,222.0 981.0,215.0 981.0,199.0 1019.0,199.0 1019.0,215.0"/><text x="1000.0" y="207" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="1000" y1="222" x2="1000" y2="262"/>
+<rect class="part" x="993" y="262" width="14" height="190" rx="2"/>
+<line class="w" x1="1000" y1="452" x2="1000" y2="492"/>
+<path class="w" d="M988 492H1012M992 498H1008M996 504H1004"/>
+<polyline class="w" points="1034,357 1014,357"/>
+<polygon class="arrowhead" points="1009,357 1016,352 1016,362"/>
+<g class="flag n-ana"><polygon points="1034.0,357.0 1041.0,349.0 1072.0,349.0 1072.0,365.0 1041.0,365.0"/><text x="1056.5" y="357" text-anchor="middle" dominant-baseline="central">FD1</text></g>
+<text class="lbl" x="1000" y="530" text-anchor="middle" dominant-baseline="central">Fader 1</text>
+<text class="sub" x="1000" y="546" text-anchor="middle" dominant-baseline="central">A0 · CC 30</text>
+<g class="flag n-vcc"><polygon points="1092.0,222.0 1073.0,215.0 1073.0,199.0 1111.0,199.0 1111.0,215.0"/><text x="1092.0" y="207" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="1092" y1="222" x2="1092" y2="262"/>
+<rect class="part" x="1085" y="262" width="14" height="190" rx="2"/>
+<line class="w" x1="1092" y1="452" x2="1092" y2="492"/>
+<path class="w" d="M1080 492H1104M1084 498H1100M1088 504H1096"/>
+<polyline class="w" points="1126,357 1106,357"/>
+<polygon class="arrowhead" points="1101,357 1108,352 1108,362"/>
+<g class="flag n-ana"><polygon points="1126.0,357.0 1133.0,349.0 1164.0,349.0 1164.0,365.0 1133.0,365.0"/><text x="1148.5" y="357" text-anchor="middle" dominant-baseline="central">FD2</text></g>
+<text class="lbl" x="1092" y="530" text-anchor="middle" dominant-baseline="central">Fader 2</text>
+<text class="sub" x="1092" y="546" text-anchor="middle" dominant-baseline="central">A1 · CC 31</text>
+<g class="flag n-vcc"><polygon points="1184.0,222.0 1165.0,215.0 1165.0,199.0 1203.0,199.0 1203.0,215.0"/><text x="1184.0" y="207" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="1184" y1="222" x2="1184" y2="262"/>
+<rect class="part" x="1177" y="262" width="14" height="190" rx="2"/>
+<line class="w" x1="1184" y1="452" x2="1184" y2="492"/>
+<path class="w" d="M1172 492H1196M1176 498H1192M1180 504H1188"/>
+<polyline class="w" points="1218,357 1198,357"/>
+<polygon class="arrowhead" points="1193,357 1200,352 1200,362"/>
+<g class="flag n-ana"><polygon points="1218.0,357.0 1225.0,349.0 1256.0,349.0 1256.0,365.0 1225.0,365.0"/><text x="1240.5" y="357" text-anchor="middle" dominant-baseline="central">FD3</text></g>
+<text class="lbl" x="1184" y="530" text-anchor="middle" dominant-baseline="central">Fader 3</text>
+<text class="sub" x="1184" y="546" text-anchor="middle" dominant-baseline="central">A2 · CC 32</text>
+<g class="flag n-vcc"><polygon points="1276.0,222.0 1257.0,215.0 1257.0,199.0 1295.0,199.0 1295.0,215.0"/><text x="1276.0" y="207" text-anchor="middle" dominant-baseline="central">VCC</text></g>
+<line class="w" x1="1276" y1="222" x2="1276" y2="262"/>
+<rect class="part" x="1269" y="262" width="14" height="190" rx="2"/>
+<line class="w" x1="1276" y1="452" x2="1276" y2="492"/>
+<path class="w" d="M1264 492H1288M1268 498H1284M1272 504H1280"/>
+<polyline class="w" points="1310,357 1290,357"/>
+<polygon class="arrowhead" points="1285,357 1292,352 1292,362"/>
+<g class="flag n-ana"><polygon points="1310.0,357.0 1317.0,349.0 1348.0,349.0 1348.0,365.0 1317.0,365.0"/><text x="1332.5" y="357" text-anchor="middle" dominant-baseline="central">FD4</text></g>
+<text class="lbl" x="1276" y="530" text-anchor="middle" dominant-baseline="central">Fader 4</text>
+<text class="sub" x="1276" y="546" text-anchor="middle" dominant-baseline="central">A3 · CC 33</text>
+<text class="ttl" x="140" y="652" text-anchor="start" dominant-baseline="central">Encoders EC11 com botão</text>
+<text class="sub" x="140" y="668" text-anchor="start" dominant-baseline="central">A, B no MCP · C no GND · botão na matriz (linha 1)</text>
+<rect class="chip" x="230" y="694" width="92" height="64" rx="6"/>
+<circle class="knob" cx="296" cy="726" r="14"/>
+<text class="lbl" x="258" y="718" text-anchor="middle" dominant-baseline="central">E1</text>
+<text class="sub" x="258" y="735" text-anchor="middle" dominant-baseline="central">CC 21</text>
+<text class="pnum" x="236" y="708" text-anchor="start" dominant-baseline="central">A</text>
+<line class="w" x1="200" y1="708" x2="230" y2="708"/>
+<g class="flag n-enc"><polygon points="200.0,708.0 193.0,700.0 162.0,700.0 162.0,716.0 193.0,716.0"/><text x="177.5" y="708" text-anchor="middle" dominant-baseline="central">E1A</text></g>
+<text class="pnum" x="236" y="726" text-anchor="start" dominant-baseline="central">C</text>
+<line class="w" x1="200" y1="726" x2="230" y2="726"/>
+<g class="flag n-gnd"><polygon points="200.0,726.0 193.0,718.0 162.0,718.0 162.0,734.0 193.0,734.0"/><text x="177.5" y="726" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="pnum" x="236" y="744" text-anchor="start" dominant-baseline="central">B</text>
+<line class="w" x1="200" y1="744" x2="230" y2="744"/>
+<g class="flag n-enc"><polygon points="200.0,744.0 193.0,736.0 162.0,736.0 162.0,752.0 193.0,752.0"/><text x="177.5" y="744" text-anchor="middle" dominant-baseline="central">E1B</text></g>
+<text class="pnum" x="316" y="715" text-anchor="end" dominant-baseline="central">SW</text>
+<text class="pnum" x="316" y="737" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="715" x2="327" y2="715"/>
+<polygon class="dio" points="327,709 327,721 357,715"/>
+<line class="w bar" x1="357" y1="709" x2="357" y2="721"/>
+<line class="w" x1="357" y1="715" x2="362" y2="715"/>
+<line class="w" x1="362" y1="715" x2="378" y2="715"/>
+<g class="flag n-row"><polygon points="378.0,715.0 385.0,707.0 424.0,707.0 424.0,723.0 385.0,723.0"/><text x="404.5" y="715" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+<line class="w" x1="322" y1="737" x2="378" y2="737"/>
+<g class="flag n-col"><polygon points="378.0,737.0 385.0,729.0 424.0,729.0 424.0,745.0 385.0,745.0"/><text x="404.5" y="737" text-anchor="middle" dominant-baseline="central">COL1</text></g>
+<rect class="chip" x="230" y="778" width="92" height="64" rx="6"/>
+<circle class="knob" cx="296" cy="810" r="14"/>
+<text class="lbl" x="258" y="802" text-anchor="middle" dominant-baseline="central">E2</text>
+<text class="sub" x="258" y="819" text-anchor="middle" dominant-baseline="central">CC 22</text>
+<text class="pnum" x="236" y="792" text-anchor="start" dominant-baseline="central">A</text>
+<line class="w" x1="200" y1="792" x2="230" y2="792"/>
+<g class="flag n-enc"><polygon points="200.0,792.0 193.0,784.0 162.0,784.0 162.0,800.0 193.0,800.0"/><text x="177.5" y="792" text-anchor="middle" dominant-baseline="central">E2A</text></g>
+<text class="pnum" x="236" y="810" text-anchor="start" dominant-baseline="central">C</text>
+<line class="w" x1="200" y1="810" x2="230" y2="810"/>
+<g class="flag n-gnd"><polygon points="200.0,810.0 193.0,802.0 162.0,802.0 162.0,818.0 193.0,818.0"/><text x="177.5" y="810" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="pnum" x="236" y="828" text-anchor="start" dominant-baseline="central">B</text>
+<line class="w" x1="200" y1="828" x2="230" y2="828"/>
+<g class="flag n-enc"><polygon points="200.0,828.0 193.0,820.0 162.0,820.0 162.0,836.0 193.0,836.0"/><text x="177.5" y="828" text-anchor="middle" dominant-baseline="central">E2B</text></g>
+<text class="pnum" x="316" y="799" text-anchor="end" dominant-baseline="central">SW</text>
+<text class="pnum" x="316" y="821" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="799" x2="327" y2="799"/>
+<polygon class="dio" points="327,793 327,805 357,799"/>
+<line class="w bar" x1="357" y1="793" x2="357" y2="805"/>
+<line class="w" x1="357" y1="799" x2="362" y2="799"/>
+<line class="w" x1="362" y1="799" x2="378" y2="799"/>
+<g class="flag n-row"><polygon points="378.0,799.0 385.0,791.0 424.0,791.0 424.0,807.0 385.0,807.0"/><text x="404.5" y="799" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+<line class="w" x1="322" y1="821" x2="378" y2="821"/>
+<g class="flag n-col"><polygon points="378.0,821.0 385.0,813.0 424.0,813.0 424.0,829.0 385.0,829.0"/><text x="404.5" y="821" text-anchor="middle" dominant-baseline="central">COL2</text></g>
+<rect class="chip" x="230" y="862" width="92" height="64" rx="6"/>
+<circle class="knob" cx="296" cy="894" r="14"/>
+<text class="lbl" x="258" y="886" text-anchor="middle" dominant-baseline="central">E3</text>
+<text class="sub" x="258" y="903" text-anchor="middle" dominant-baseline="central">CC 23</text>
+<text class="pnum" x="236" y="876" text-anchor="start" dominant-baseline="central">A</text>
+<line class="w" x1="200" y1="876" x2="230" y2="876"/>
+<g class="flag n-enc"><polygon points="200.0,876.0 193.0,868.0 162.0,868.0 162.0,884.0 193.0,884.0"/><text x="177.5" y="876" text-anchor="middle" dominant-baseline="central">E3A</text></g>
+<text class="pnum" x="236" y="894" text-anchor="start" dominant-baseline="central">C</text>
+<line class="w" x1="200" y1="894" x2="230" y2="894"/>
+<g class="flag n-gnd"><polygon points="200.0,894.0 193.0,886.0 162.0,886.0 162.0,902.0 193.0,902.0"/><text x="177.5" y="894" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="pnum" x="236" y="912" text-anchor="start" dominant-baseline="central">B</text>
+<line class="w" x1="200" y1="912" x2="230" y2="912"/>
+<g class="flag n-enc"><polygon points="200.0,912.0 193.0,904.0 162.0,904.0 162.0,920.0 193.0,920.0"/><text x="177.5" y="912" text-anchor="middle" dominant-baseline="central">E3B</text></g>
+<text class="pnum" x="316" y="883" text-anchor="end" dominant-baseline="central">SW</text>
+<text class="pnum" x="316" y="905" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="883" x2="327" y2="883"/>
+<polygon class="dio" points="327,877 327,889 357,883"/>
+<line class="w bar" x1="357" y1="877" x2="357" y2="889"/>
+<line class="w" x1="357" y1="883" x2="362" y2="883"/>
+<line class="w" x1="362" y1="883" x2="378" y2="883"/>
+<g class="flag n-row"><polygon points="378.0,883.0 385.0,875.0 424.0,875.0 424.0,891.0 385.0,891.0"/><text x="404.5" y="883" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+<line class="w" x1="322" y1="905" x2="378" y2="905"/>
+<g class="flag n-col"><polygon points="378.0,905.0 385.0,897.0 424.0,897.0 424.0,913.0 385.0,913.0"/><text x="404.5" y="905" text-anchor="middle" dominant-baseline="central">COL3</text></g>
+<rect class="chip" x="230" y="946" width="92" height="64" rx="6"/>
+<circle class="knob" cx="296" cy="978" r="14"/>
+<text class="lbl" x="258" y="970" text-anchor="middle" dominant-baseline="central">E4</text>
+<text class="sub" x="258" y="987" text-anchor="middle" dominant-baseline="central">CC 24</text>
+<text class="pnum" x="236" y="960" text-anchor="start" dominant-baseline="central">A</text>
+<line class="w" x1="200" y1="960" x2="230" y2="960"/>
+<g class="flag n-enc"><polygon points="200.0,960.0 193.0,952.0 162.0,952.0 162.0,968.0 193.0,968.0"/><text x="177.5" y="960" text-anchor="middle" dominant-baseline="central">E4A</text></g>
+<text class="pnum" x="236" y="978" text-anchor="start" dominant-baseline="central">C</text>
+<line class="w" x1="200" y1="978" x2="230" y2="978"/>
+<g class="flag n-gnd"><polygon points="200.0,978.0 193.0,970.0 162.0,970.0 162.0,986.0 193.0,986.0"/><text x="177.5" y="978" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="pnum" x="236" y="996" text-anchor="start" dominant-baseline="central">B</text>
+<line class="w" x1="200" y1="996" x2="230" y2="996"/>
+<g class="flag n-enc"><polygon points="200.0,996.0 193.0,988.0 162.0,988.0 162.0,1004.0 193.0,1004.0"/><text x="177.5" y="996" text-anchor="middle" dominant-baseline="central">E4B</text></g>
+<text class="pnum" x="316" y="967" text-anchor="end" dominant-baseline="central">SW</text>
+<text class="pnum" x="316" y="989" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="967" x2="327" y2="967"/>
+<polygon class="dio" points="327,961 327,973 357,967"/>
+<line class="w bar" x1="357" y1="961" x2="357" y2="973"/>
+<line class="w" x1="357" y1="967" x2="362" y2="967"/>
+<line class="w" x1="362" y1="967" x2="378" y2="967"/>
+<g class="flag n-row"><polygon points="378.0,967.0 385.0,959.0 424.0,959.0 424.0,975.0 385.0,975.0"/><text x="404.5" y="967" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+<line class="w" x1="322" y1="989" x2="378" y2="989"/>
+<g class="flag n-col"><polygon points="378.0,989.0 385.0,981.0 424.0,981.0 424.0,997.0 385.0,997.0"/><text x="404.5" y="989" text-anchor="middle" dominant-baseline="central">COL4</text></g>
+<rect class="chip" x="230" y="1030" width="92" height="64" rx="6"/>
+<circle class="knob" cx="296" cy="1062" r="14"/>
+<text class="lbl" x="258" y="1054" text-anchor="middle" dominant-baseline="central">E5</text>
+<text class="sub" x="258" y="1071" text-anchor="middle" dominant-baseline="central">CC 25</text>
+<text class="pnum" x="236" y="1044" text-anchor="start" dominant-baseline="central">A</text>
+<line class="w" x1="200" y1="1044" x2="230" y2="1044"/>
+<g class="flag n-enc"><polygon points="200.0,1044.0 193.0,1036.0 162.0,1036.0 162.0,1052.0 193.0,1052.0"/><text x="177.5" y="1044" text-anchor="middle" dominant-baseline="central">E5A</text></g>
+<text class="pnum" x="236" y="1062" text-anchor="start" dominant-baseline="central">C</text>
+<line class="w" x1="200" y1="1062" x2="230" y2="1062"/>
+<g class="flag n-gnd"><polygon points="200.0,1062.0 193.0,1054.0 162.0,1054.0 162.0,1070.0 193.0,1070.0"/><text x="177.5" y="1062" text-anchor="middle" dominant-baseline="central">GND</text></g>
+<text class="pnum" x="236" y="1080" text-anchor="start" dominant-baseline="central">B</text>
+<line class="w" x1="200" y1="1080" x2="230" y2="1080"/>
+<g class="flag n-enc"><polygon points="200.0,1080.0 193.0,1072.0 162.0,1072.0 162.0,1088.0 193.0,1088.0"/><text x="177.5" y="1080" text-anchor="middle" dominant-baseline="central">E5B</text></g>
+<text class="pnum" x="316" y="1051" text-anchor="end" dominant-baseline="central">SW</text>
+<text class="pnum" x="316" y="1073" text-anchor="end" dominant-baseline="central">SW</text>
+<line class="w" x1="322" y1="1051" x2="327" y2="1051"/>
+<polygon class="dio" points="327,1045 327,1057 357,1051"/>
+<line class="w bar" x1="357" y1="1045" x2="357" y2="1057"/>
+<line class="w" x1="357" y1="1051" x2="362" y2="1051"/>
+<line class="w" x1="362" y1="1051" x2="378" y2="1051"/>
+<g class="flag n-row"><polygon points="378.0,1051.0 385.0,1043.0 424.0,1043.0 424.0,1059.0 385.0,1059.0"/><text x="404.5" y="1051" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+<line class="w" x1="322" y1="1073" x2="378" y2="1073"/>
+<g class="flag n-col"><polygon points="378.0,1073.0 385.0,1065.0 424.0,1065.0 424.0,1081.0 385.0,1081.0"/><text x="404.5" y="1073" text-anchor="middle" dominant-baseline="central">COL5</text></g>
+<text class="ttl" x="660" y="652" text-anchor="start" dominant-baseline="central">Matriz 7×5 · um diodo 1N4148 por tecla</text>
+<text class="sub" x="660" y="668" text-anchor="start" dominant-baseline="central">Faixa do diodo do lado da linha · n = nota MIDI</text>
+<g class="flag n-row"><polygon points="710.0,752.0 703.0,744.0 664.0,744.0 664.0,760.0 703.0,760.0"/><text x="683.5" y="752" text-anchor="middle" dominant-baseline="central">LIN1</text></g>
+<line class="w" x1="710" y1="752" x2="1334" y2="752"/>
+<g class="flag n-row"><polygon points="710.0,806.0 703.0,798.0 664.0,798.0 664.0,814.0 703.0,814.0"/><text x="683.5" y="806" text-anchor="middle" dominant-baseline="central">LIN2</text></g>
+<line class="w" x1="710" y1="806" x2="1334" y2="806"/>
+<g class="flag n-row"><polygon points="710.0,860.0 703.0,852.0 664.0,852.0 664.0,868.0 703.0,868.0"/><text x="683.5" y="860" text-anchor="middle" dominant-baseline="central">LIN3</text></g>
+<line class="w" x1="710" y1="860" x2="1334" y2="860"/>
+<g class="flag n-row"><polygon points="710.0,914.0 703.0,906.0 664.0,906.0 664.0,922.0 703.0,922.0"/><text x="683.5" y="914" text-anchor="middle" dominant-baseline="central">LIN4</text></g>
+<line class="w" x1="710" y1="914" x2="1334" y2="914"/>
+<g class="flag n-row"><polygon points="710.0,968.0 703.0,960.0 664.0,960.0 664.0,976.0 703.0,976.0"/><text x="683.5" y="968" text-anchor="middle" dominant-baseline="central">LIN5</text></g>
+<line class="w" x1="710" y1="968" x2="1334" y2="968"/>
+<g class="flag n-row"><polygon points="710.0,1022.0 703.0,1014.0 664.0,1014.0 664.0,1030.0 703.0,1030.0"/><text x="683.5" y="1022" text-anchor="middle" dominant-baseline="central">LIN6</text></g>
+<line class="w" x1="710" y1="1022" x2="1334" y2="1022"/>
+<g class="flag n-row"><polygon points="710.0,1076.0 703.0,1068.0 664.0,1068.0 664.0,1084.0 703.0,1084.0"/><text x="683.5" y="1076" text-anchor="middle" dominant-baseline="central">LIN7</text></g>
+<line class="w" x1="710" y1="1076" x2="1334" y2="1076"/>
+<g class="flag n-col"><polygon points="770.0,712.0 747.0,705.0 747.0,689.0 793.0,689.0 793.0,705.0"/><text x="770.0" y="697" text-anchor="middle" dominant-baseline="central">COL1</text></g>
+<line class="w" x1="770" y1="712" x2="770" y2="1042"/>
+<g class="flag n-col"><polygon points="886.0,712.0 863.0,705.0 863.0,689.0 909.0,689.0 909.0,705.0"/><text x="886.0" y="697" text-anchor="middle" dominant-baseline="central">COL2</text></g>
+<line class="w" x1="886" y1="712" x2="886" y2="1042"/>
+<g class="flag n-col"><polygon points="1002.0,712.0 979.0,705.0 979.0,689.0 1025.0,689.0 1025.0,705.0"/><text x="1002.0" y="697" text-anchor="middle" dominant-baseline="central">COL3</text></g>
+<line class="w" x1="1002" y1="712" x2="1002" y2="1042"/>
+<g class="flag n-col"><polygon points="1118.0,712.0 1095.0,705.0 1095.0,689.0 1141.0,689.0 1141.0,705.0"/><text x="1118.0" y="697" text-anchor="middle" dominant-baseline="central">COL4</text></g>
+<line class="w" x1="1118" y1="712" x2="1118" y2="1042"/>
+<g class="flag n-col"><polygon points="1234.0,712.0 1211.0,705.0 1211.0,689.0 1257.0,689.0 1257.0,705.0"/><text x="1234.0" y="697" text-anchor="middle" dominant-baseline="central">COL5</text></g>
+<line class="w" x1="1234" y1="712" x2="1234" y2="1042"/>
+<rect class="ghost" x="780" y="708" width="70" height="30" rx="4"/>
+<text class="ghost-t" x="815" y="723" text-anchor="middle" dominant-baseline="central">botão E1</text>
+<rect class="ghost" x="896" y="708" width="70" height="30" rx="4"/>
+<text class="ghost-t" x="931" y="723" text-anchor="middle" dominant-baseline="central">botão E2</text>
+<rect class="ghost" x="1012" y="708" width="70" height="30" rx="4"/>
+<text class="ghost-t" x="1047" y="723" text-anchor="middle" dominant-baseline="central">botão E3</text>
+<rect class="ghost" x="1128" y="708" width="70" height="30" rx="4"/>
+<text class="ghost-t" x="1163" y="723" text-anchor="middle" dominant-baseline="central">botão E4</text>
+<rect class="ghost" x="1244" y="708" width="70" height="30" rx="4"/>
+<text class="ghost-t" x="1279" y="723" text-anchor="middle" dominant-baseline="central">botão E5</text>
+<circle class="jn" cx="770" cy="774" r="3"/>
+<line class="w" x1="770" y1="774" x2="782" y2="774"/>
+<circle class="term" cx="784" cy="774" r="2.4"/>
+<circle class="term" cx="810" cy="774" r="2.4"/>
+<line class="w" x1="786" y1="773" x2="806" y2="764"/>
+<line class="w" x1="812" y1="774" x2="828" y2="774"/>
+<line class="w" x1="828" y1="774" x2="828" y2="780"/>
+<polygon class="dio" points="822,780 834,780 828,800"/>
+<line class="w bar" x1="822" y1="800" x2="834" y2="800"/>
+<line class="w" x1="828" y1="800" x2="828" y2="806"/>
+<circle class="jn" cx="828" cy="806" r="3"/>
+<text class="pnum" x="840" y="776" text-anchor="start" dominant-baseline="central">n6</text>
+<circle class="jn" cx="886" cy="774" r="3"/>
+<line class="w" x1="886" y1="774" x2="898" y2="774"/>
+<circle class="term" cx="900" cy="774" r="2.4"/>
+<circle class="term" cx="926" cy="774" r="2.4"/>
+<line class="w" x1="902" y1="773" x2="922" y2="764"/>
+<line class="w" x1="928" y1="774" x2="944" y2="774"/>
+<line class="w" x1="944" y1="774" x2="944" y2="780"/>
+<polygon class="dio" points="938,780 950,780 944,800"/>
+<line class="w bar" x1="938" y1="800" x2="950" y2="800"/>
+<line class="w" x1="944" y1="800" x2="944" y2="806"/>
+<circle class="jn" cx="944" cy="806" r="3"/>
+<text class="pnum" x="956" y="776" text-anchor="start" dominant-baseline="central">n7</text>
+<circle class="jn" cx="1002" cy="774" r="3"/>
+<line class="w" x1="1002" y1="774" x2="1014" y2="774"/>
+<circle class="term" cx="1016" cy="774" r="2.4"/>
+<circle class="term" cx="1042" cy="774" r="2.4"/>
+<line class="w" x1="1018" y1="773" x2="1038" y2="764"/>
+<line class="w" x1="1044" y1="774" x2="1060" y2="774"/>
+<line class="w" x1="1060" y1="774" x2="1060" y2="780"/>
+<polygon class="dio" points="1054,780 1066,780 1060,800"/>
+<line class="w bar" x1="1054" y1="800" x2="1066" y2="800"/>
+<line class="w" x1="1060" y1="800" x2="1060" y2="806"/>
+<circle class="jn" cx="1060" cy="806" r="3"/>
+<text class="pnum" x="1072" y="776" text-anchor="start" dominant-baseline="central">n8</text>
+<circle class="jn" cx="1118" cy="774" r="3"/>
+<line class="w" x1="1118" y1="774" x2="1130" y2="774"/>
+<circle class="term" cx="1132" cy="774" r="2.4"/>
+<circle class="term" cx="1158" cy="774" r="2.4"/>
+<line class="w" x1="1134" y1="773" x2="1154" y2="764"/>
+<line class="w" x1="1160" y1="774" x2="1176" y2="774"/>
+<line class="w" x1="1176" y1="774" x2="1176" y2="780"/>
+<polygon class="dio" points="1170,780 1182,780 1176,800"/>
+<line class="w bar" x1="1170" y1="800" x2="1182" y2="800"/>
+<line class="w" x1="1176" y1="800" x2="1176" y2="806"/>
+<circle class="jn" cx="1176" cy="806" r="3"/>
+<text class="pnum" x="1188" y="776" text-anchor="start" dominant-baseline="central">n9</text>
+<circle class="jn" cx="1234" cy="774" r="3"/>
+<line class="w" x1="1234" y1="774" x2="1246" y2="774"/>
+<circle class="term" cx="1248" cy="774" r="2.4"/>
+<circle class="term" cx="1274" cy="774" r="2.4"/>
+<line class="w" x1="1250" y1="773" x2="1270" y2="764"/>
+<line class="w" x1="1276" y1="774" x2="1292" y2="774"/>
+<line class="w" x1="1292" y1="774" x2="1292" y2="780"/>
+<polygon class="dio" points="1286,780 1298,780 1292,800"/>
+<line class="w bar" x1="1286" y1="800" x2="1298" y2="800"/>
+<line class="w" x1="1292" y1="800" x2="1292" y2="806"/>
+<circle class="jn" cx="1292" cy="806" r="3"/>
+<text class="pnum" x="1304" y="776" text-anchor="start" dominant-baseline="central">n10</text>
+<circle class="jn" cx="770" cy="828" r="3"/>
+<line class="w" x1="770" y1="828" x2="782" y2="828"/>
+<circle class="term" cx="784" cy="828" r="2.4"/>
+<circle class="term" cx="810" cy="828" r="2.4"/>
+<line class="w" x1="786" y1="827" x2="806" y2="818"/>
+<line class="w" x1="812" y1="828" x2="828" y2="828"/>
+<line class="w" x1="828" y1="828" x2="828" y2="834"/>
+<polygon class="dio" points="822,834 834,834 828,854"/>
+<line class="w bar" x1="822" y1="854" x2="834" y2="854"/>
+<line class="w" x1="828" y1="854" x2="828" y2="860"/>
+<circle class="jn" cx="828" cy="860" r="3"/>
+<text class="pnum" x="840" y="830" text-anchor="start" dominant-baseline="central">n11</text>
+<circle class="jn" cx="886" cy="828" r="3"/>
+<line class="w" x1="886" y1="828" x2="898" y2="828"/>
+<circle class="term" cx="900" cy="828" r="2.4"/>
+<circle class="term" cx="926" cy="828" r="2.4"/>
+<line class="w" x1="902" y1="827" x2="922" y2="818"/>
+<line class="w" x1="928" y1="828" x2="944" y2="828"/>
+<line class="w" x1="944" y1="828" x2="944" y2="834"/>
+<polygon class="dio" points="938,834 950,834 944,854"/>
+<line class="w bar" x1="938" y1="854" x2="950" y2="854"/>
+<line class="w" x1="944" y1="854" x2="944" y2="860"/>
+<circle class="jn" cx="944" cy="860" r="3"/>
+<text class="pnum" x="956" y="830" text-anchor="start" dominant-baseline="central">n12</text>
+<circle class="jn" cx="1002" cy="828" r="3"/>
+<line class="w" x1="1002" y1="828" x2="1014" y2="828"/>
+<circle class="term" cx="1016" cy="828" r="2.4"/>
+<circle class="term" cx="1042" cy="828" r="2.4"/>
+<line class="w" x1="1018" y1="827" x2="1038" y2="818"/>
+<line class="w" x1="1044" y1="828" x2="1060" y2="828"/>
+<line class="w" x1="1060" y1="828" x2="1060" y2="834"/>
+<polygon class="dio" points="1054,834 1066,834 1060,854"/>
+<line class="w bar" x1="1054" y1="854" x2="1066" y2="854"/>
+<line class="w" x1="1060" y1="854" x2="1060" y2="860"/>
+<circle class="jn" cx="1060" cy="860" r="3"/>
+<text class="pnum" x="1072" y="830" text-anchor="start" dominant-baseline="central">n13</text>
+<circle class="jn" cx="1118" cy="828" r="3"/>
+<line class="w" x1="1118" y1="828" x2="1130" y2="828"/>
+<circle class="term" cx="1132" cy="828" r="2.4"/>
+<circle class="term" cx="1158" cy="828" r="2.4"/>
+<line class="w" x1="1134" y1="827" x2="1154" y2="818"/>
+<line class="w" x1="1160" y1="828" x2="1176" y2="828"/>
+<line class="w" x1="1176" y1="828" x2="1176" y2="834"/>
+<polygon class="dio" points="1170,834 1182,834 1176,854"/>
+<line class="w bar" x1="1170" y1="854" x2="1182" y2="854"/>
+<line class="w" x1="1176" y1="854" x2="1176" y2="860"/>
+<circle class="jn" cx="1176" cy="860" r="3"/>
+<text class="pnum" x="1188" y="830" text-anchor="start" dominant-baseline="central">n14</text>
+<circle class="jn" cx="1234" cy="828" r="3"/>
+<line class="w" x1="1234" y1="828" x2="1246" y2="828"/>
+<circle class="term" cx="1248" cy="828" r="2.4"/>
+<circle class="term" cx="1274" cy="828" r="2.4"/>
+<line class="w" x1="1250" y1="827" x2="1270" y2="818"/>
+<line class="w" x1="1276" y1="828" x2="1292" y2="828"/>
+<line class="w" x1="1292" y1="828" x2="1292" y2="834"/>
+<polygon class="dio" points="1286,834 1298,834 1292,854"/>
+<line class="w bar" x1="1286" y1="854" x2="1298" y2="854"/>
+<line class="w" x1="1292" y1="854" x2="1292" y2="860"/>
+<circle class="jn" cx="1292" cy="860" r="3"/>
+<text class="pnum" x="1304" y="830" text-anchor="start" dominant-baseline="central">n15</text>
+<circle class="jn" cx="770" cy="882" r="3"/>
+<line class="w" x1="770" y1="882" x2="782" y2="882"/>
+<circle class="term" cx="784" cy="882" r="2.4"/>
+<circle class="term" cx="810" cy="882" r="2.4"/>
+<line class="w" x1="786" y1="881" x2="806" y2="872"/>
+<line class="w" x1="812" y1="882" x2="828" y2="882"/>
+<line class="w" x1="828" y1="882" x2="828" y2="888"/>
+<polygon class="dio" points="822,888 834,888 828,908"/>
+<line class="w bar" x1="822" y1="908" x2="834" y2="908"/>
+<line class="w" x1="828" y1="908" x2="828" y2="914"/>
+<circle class="jn" cx="828" cy="914" r="3"/>
+<text class="pnum" x="840" y="884" text-anchor="start" dominant-baseline="central">n16</text>
+<circle class="jn" cx="886" cy="882" r="3"/>
+<line class="w" x1="886" y1="882" x2="898" y2="882"/>
+<circle class="term" cx="900" cy="882" r="2.4"/>
+<circle class="term" cx="926" cy="882" r="2.4"/>
+<line class="w" x1="902" y1="881" x2="922" y2="872"/>
+<line class="w" x1="928" y1="882" x2="944" y2="882"/>
+<line class="w" x1="944" y1="882" x2="944" y2="888"/>
+<polygon class="dio" points="938,888 950,888 944,908"/>
+<line class="w bar" x1="938" y1="908" x2="950" y2="908"/>
+<line class="w" x1="944" y1="908" x2="944" y2="914"/>
+<circle class="jn" cx="944" cy="914" r="3"/>
+<text class="pnum" x="956" y="884" text-anchor="start" dominant-baseline="central">n17</text>
+<circle class="jn" cx="1002" cy="882" r="3"/>
+<line class="w" x1="1002" y1="882" x2="1014" y2="882"/>
+<circle class="term" cx="1016" cy="882" r="2.4"/>
+<circle class="term" cx="1042" cy="882" r="2.4"/>
+<line class="w" x1="1018" y1="881" x2="1038" y2="872"/>
+<line class="w" x1="1044" y1="882" x2="1060" y2="882"/>
+<line class="w" x1="1060" y1="882" x2="1060" y2="888"/>
+<polygon class="dio" points="1054,888 1066,888 1060,908"/>
+<line class="w bar" x1="1054" y1="908" x2="1066" y2="908"/>
+<line class="w" x1="1060" y1="908" x2="1060" y2="914"/>
+<circle class="jn" cx="1060" cy="914" r="3"/>
+<text class="pnum" x="1072" y="884" text-anchor="start" dominant-baseline="central">n18</text>
+<circle class="jn" cx="1118" cy="882" r="3"/>
+<line class="w" x1="1118" y1="882" x2="1130" y2="882"/>
+<circle class="term" cx="1132" cy="882" r="2.4"/>
+<circle class="term" cx="1158" cy="882" r="2.4"/>
+<line class="w" x1="1134" y1="881" x2="1154" y2="872"/>
+<line class="w" x1="1160" y1="882" x2="1176" y2="882"/>
+<line class="w" x1="1176" y1="882" x2="1176" y2="888"/>
+<polygon class="dio" points="1170,888 1182,888 1176,908"/>
+<line class="w bar" x1="1170" y1="908" x2="1182" y2="908"/>
+<line class="w" x1="1176" y1="908" x2="1176" y2="914"/>
+<circle class="jn" cx="1176" cy="914" r="3"/>
+<text class="pnum" x="1188" y="884" text-anchor="start" dominant-baseline="central">n19</text>
+<circle class="jn" cx="1234" cy="882" r="3"/>
+<line class="w" x1="1234" y1="882" x2="1246" y2="882"/>
+<circle class="term" cx="1248" cy="882" r="2.4"/>
+<circle class="term" cx="1274" cy="882" r="2.4"/>
+<line class="w" x1="1250" y1="881" x2="1270" y2="872"/>
+<line class="w" x1="1276" y1="882" x2="1292" y2="882"/>
+<line class="w" x1="1292" y1="882" x2="1292" y2="888"/>
+<polygon class="dio" points="1286,888 1298,888 1292,908"/>
+<line class="w bar" x1="1286" y1="908" x2="1298" y2="908"/>
+<line class="w" x1="1292" y1="908" x2="1292" y2="914"/>
+<circle class="jn" cx="1292" cy="914" r="3"/>
+<text class="pnum" x="1304" y="884" text-anchor="start" dominant-baseline="central">n20</text>
+<circle class="jn" cx="770" cy="936" r="3"/>
+<line class="w" x1="770" y1="936" x2="782" y2="936"/>
+<circle class="term" cx="784" cy="936" r="2.4"/>
+<circle class="term" cx="810" cy="936" r="2.4"/>
+<line class="w" x1="786" y1="935" x2="806" y2="926"/>
+<line class="w" x1="812" y1="936" x2="828" y2="936"/>
+<line class="w" x1="828" y1="936" x2="828" y2="942"/>
+<polygon class="dio" points="822,942 834,942 828,962"/>
+<line class="w bar" x1="822" y1="962" x2="834" y2="962"/>
+<line class="w" x1="828" y1="962" x2="828" y2="968"/>
+<circle class="jn" cx="828" cy="968" r="3"/>
+<text class="pnum" x="840" y="938" text-anchor="start" dominant-baseline="central">n21</text>
+<circle class="jn" cx="886" cy="936" r="3"/>
+<line class="w" x1="886" y1="936" x2="898" y2="936"/>
+<circle class="term" cx="900" cy="936" r="2.4"/>
+<circle class="term" cx="926" cy="936" r="2.4"/>
+<line class="w" x1="902" y1="935" x2="922" y2="926"/>
+<line class="w" x1="928" y1="936" x2="944" y2="936"/>
+<line class="w" x1="944" y1="936" x2="944" y2="942"/>
+<polygon class="dio" points="938,942 950,942 944,962"/>
+<line class="w bar" x1="938" y1="962" x2="950" y2="962"/>
+<line class="w" x1="944" y1="962" x2="944" y2="968"/>
+<circle class="jn" cx="944" cy="968" r="3"/>
+<text class="pnum" x="956" y="938" text-anchor="start" dominant-baseline="central">n22</text>
+<circle class="jn" cx="1002" cy="936" r="3"/>
+<line class="w" x1="1002" y1="936" x2="1014" y2="936"/>
+<circle class="term" cx="1016" cy="936" r="2.4"/>
+<circle class="term" cx="1042" cy="936" r="2.4"/>
+<line class="w" x1="1018" y1="935" x2="1038" y2="926"/>
+<line class="w" x1="1044" y1="936" x2="1060" y2="936"/>
+<line class="w" x1="1060" y1="936" x2="1060" y2="942"/>
+<polygon class="dio" points="1054,942 1066,942 1060,962"/>
+<line class="w bar" x1="1054" y1="962" x2="1066" y2="962"/>
+<line class="w" x1="1060" y1="962" x2="1060" y2="968"/>
+<circle class="jn" cx="1060" cy="968" r="3"/>
+<text class="pnum" x="1072" y="938" text-anchor="start" dominant-baseline="central">n23</text>
+<circle class="jn" cx="1118" cy="936" r="3"/>
+<line class="w" x1="1118" y1="936" x2="1130" y2="936"/>
+<circle class="term" cx="1132" cy="936" r="2.4"/>
+<circle class="term" cx="1158" cy="936" r="2.4"/>
+<line class="w" x1="1134" y1="935" x2="1154" y2="926"/>
+<line class="w" x1="1160" y1="936" x2="1176" y2="936"/>
+<line class="w" x1="1176" y1="936" x2="1176" y2="942"/>
+<polygon class="dio" points="1170,942 1182,942 1176,962"/>
+<line class="w bar" x1="1170" y1="962" x2="1182" y2="962"/>
+<line class="w" x1="1176" y1="962" x2="1176" y2="968"/>
+<circle class="jn" cx="1176" cy="968" r="3"/>
+<text class="pnum" x="1188" y="938" text-anchor="start" dominant-baseline="central">n24</text>
+<circle class="jn" cx="1234" cy="936" r="3"/>
+<line class="w" x1="1234" y1="936" x2="1246" y2="936"/>
+<circle class="term" cx="1248" cy="936" r="2.4"/>
+<circle class="term" cx="1274" cy="936" r="2.4"/>
+<line class="w" x1="1250" y1="935" x2="1270" y2="926"/>
+<line class="w" x1="1276" y1="936" x2="1292" y2="936"/>
+<line class="w" x1="1292" y1="936" x2="1292" y2="942"/>
+<polygon class="dio" points="1286,942 1298,942 1292,962"/>
+<line class="w bar" x1="1286" y1="962" x2="1298" y2="962"/>
+<line class="w" x1="1292" y1="962" x2="1292" y2="968"/>
+<circle class="jn" cx="1292" cy="968" r="3"/>
+<text class="pnum" x="1304" y="938" text-anchor="start" dominant-baseline="central">n25</text>
+<circle class="jn" cx="770" cy="990" r="3"/>
+<line class="w" x1="770" y1="990" x2="782" y2="990"/>
+<circle class="term" cx="784" cy="990" r="2.4"/>
+<circle class="term" cx="810" cy="990" r="2.4"/>
+<line class="w" x1="786" y1="989" x2="806" y2="980"/>
+<line class="w" x1="812" y1="990" x2="828" y2="990"/>
+<line class="w" x1="828" y1="990" x2="828" y2="996"/>
+<polygon class="dio" points="822,996 834,996 828,1016"/>
+<line class="w bar" x1="822" y1="1016" x2="834" y2="1016"/>
+<line class="w" x1="828" y1="1016" x2="828" y2="1022"/>
+<circle class="jn" cx="828" cy="1022" r="3"/>
+<text class="pnum" x="840" y="992" text-anchor="start" dominant-baseline="central">n26</text>
+<circle class="jn" cx="886" cy="990" r="3"/>
+<line class="w" x1="886" y1="990" x2="898" y2="990"/>
+<circle class="term" cx="900" cy="990" r="2.4"/>
+<circle class="term" cx="926" cy="990" r="2.4"/>
+<line class="w" x1="902" y1="989" x2="922" y2="980"/>
+<line class="w" x1="928" y1="990" x2="944" y2="990"/>
+<line class="w" x1="944" y1="990" x2="944" y2="996"/>
+<polygon class="dio" points="938,996 950,996 944,1016"/>
+<line class="w bar" x1="938" y1="1016" x2="950" y2="1016"/>
+<line class="w" x1="944" y1="1016" x2="944" y2="1022"/>
+<circle class="jn" cx="944" cy="1022" r="3"/>
+<text class="pnum" x="956" y="992" text-anchor="start" dominant-baseline="central">n27</text>
+<circle class="jn" cx="1002" cy="990" r="3"/>
+<line class="w" x1="1002" y1="990" x2="1014" y2="990"/>
+<circle class="term" cx="1016" cy="990" r="2.4"/>
+<circle class="term" cx="1042" cy="990" r="2.4"/>
+<line class="w" x1="1018" y1="989" x2="1038" y2="980"/>
+<line class="w" x1="1044" y1="990" x2="1060" y2="990"/>
+<line class="w" x1="1060" y1="990" x2="1060" y2="996"/>
+<polygon class="dio" points="1054,996 1066,996 1060,1016"/>
+<line class="w bar" x1="1054" y1="1016" x2="1066" y2="1016"/>
+<line class="w" x1="1060" y1="1016" x2="1060" y2="1022"/>
+<circle class="jn" cx="1060" cy="1022" r="3"/>
+<text class="pnum" x="1072" y="992" text-anchor="start" dominant-baseline="central">n28</text>
+<circle class="jn" cx="1118" cy="990" r="3"/>
+<line class="w" x1="1118" y1="990" x2="1130" y2="990"/>
+<circle class="term" cx="1132" cy="990" r="2.4"/>
+<circle class="term" cx="1158" cy="990" r="2.4"/>
+<line class="w" x1="1134" y1="989" x2="1154" y2="980"/>
+<line class="w" x1="1160" y1="990" x2="1176" y2="990"/>
+<line class="w" x1="1176" y1="990" x2="1176" y2="996"/>
+<polygon class="dio" points="1170,996 1182,996 1176,1016"/>
+<line class="w bar" x1="1170" y1="1016" x2="1182" y2="1016"/>
+<line class="w" x1="1176" y1="1016" x2="1176" y2="1022"/>
+<circle class="jn" cx="1176" cy="1022" r="3"/>
+<text class="pnum" x="1188" y="992" text-anchor="start" dominant-baseline="central">n29</text>
+<circle class="jn" cx="1234" cy="990" r="3"/>
+<line class="w" x1="1234" y1="990" x2="1246" y2="990"/>
+<circle class="term" cx="1248" cy="990" r="2.4"/>
+<circle class="term" cx="1274" cy="990" r="2.4"/>
+<line class="w" x1="1250" y1="989" x2="1270" y2="980"/>
+<line class="w" x1="1276" y1="990" x2="1292" y2="990"/>
+<line class="w" x1="1292" y1="990" x2="1292" y2="996"/>
+<polygon class="dio" points="1286,996 1298,996 1292,1016"/>
+<line class="w bar" x1="1286" y1="1016" x2="1298" y2="1016"/>
+<line class="w" x1="1292" y1="1016" x2="1292" y2="1022"/>
+<circle class="jn" cx="1292" cy="1022" r="3"/>
+<text class="pnum" x="1304" y="992" text-anchor="start" dominant-baseline="central">n30</text>
+<circle class="jn" cx="770" cy="1044" r="3"/>
+<line class="w" x1="770" y1="1044" x2="782" y2="1044"/>
+<circle class="term" cx="784" cy="1044" r="2.4"/>
+<circle class="term" cx="810" cy="1044" r="2.4"/>
+<line class="w" x1="786" y1="1043" x2="806" y2="1034"/>
+<line class="w" x1="812" y1="1044" x2="828" y2="1044"/>
+<line class="w" x1="828" y1="1044" x2="828" y2="1050"/>
+<polygon class="dio" points="822,1050 834,1050 828,1070"/>
+<line class="w bar" x1="822" y1="1070" x2="834" y2="1070"/>
+<line class="w" x1="828" y1="1070" x2="828" y2="1076"/>
+<circle class="jn" cx="828" cy="1076" r="3"/>
+<text class="pnum" x="840" y="1046" text-anchor="start" dominant-baseline="central">n31</text>
+<circle class="jn" cx="886" cy="1044" r="3"/>
+<line class="w" x1="886" y1="1044" x2="898" y2="1044"/>
+<circle class="term" cx="900" cy="1044" r="2.4"/>
+<circle class="term" cx="926" cy="1044" r="2.4"/>
+<line class="w" x1="902" y1="1043" x2="922" y2="1034"/>
+<line class="w" x1="928" y1="1044" x2="944" y2="1044"/>
+<line class="w" x1="944" y1="1044" x2="944" y2="1050"/>
+<polygon class="dio" points="938,1050 950,1050 944,1070"/>
+<line class="w bar" x1="938" y1="1070" x2="950" y2="1070"/>
+<line class="w" x1="944" y1="1070" x2="944" y2="1076"/>
+<circle class="jn" cx="944" cy="1076" r="3"/>
+<text class="pnum" x="956" y="1046" text-anchor="start" dominant-baseline="central">n32</text>
+<circle class="jn" cx="1002" cy="1044" r="3"/>
+<line class="w" x1="1002" y1="1044" x2="1014" y2="1044"/>
+<circle class="term" cx="1016" cy="1044" r="2.4"/>
+<circle class="term" cx="1042" cy="1044" r="2.4"/>
+<line class="w" x1="1018" y1="1043" x2="1038" y2="1034"/>
+<line class="w" x1="1044" y1="1044" x2="1060" y2="1044"/>
+<line class="w" x1="1060" y1="1044" x2="1060" y2="1050"/>
+<polygon class="dio" points="1054,1050 1066,1050 1060,1070"/>
+<line class="w bar" x1="1054" y1="1070" x2="1066" y2="1070"/>
+<line class="w" x1="1060" y1="1070" x2="1060" y2="1076"/>
+<circle class="jn" cx="1060" cy="1076" r="3"/>
+<text class="pnum" x="1072" y="1046" text-anchor="start" dominant-baseline="central">n33</text>
+<circle class="jn" cx="1118" cy="1044" r="3"/>
+<line class="w" x1="1118" y1="1044" x2="1130" y2="1044"/>
+<circle class="term" cx="1132" cy="1044" r="2.4"/>
+<circle class="term" cx="1158" cy="1044" r="2.4"/>
+<line class="w" x1="1134" y1="1043" x2="1154" y2="1034"/>
+<line class="w" x1="1160" y1="1044" x2="1176" y2="1044"/>
+<line class="w" x1="1176" y1="1044" x2="1176" y2="1050"/>
+<polygon class="dio" points="1170,1050 1182,1050 1176,1070"/>
+<line class="w bar" x1="1170" y1="1070" x2="1182" y2="1070"/>
+<line class="w" x1="1176" y1="1070" x2="1176" y2="1076"/>
+<circle class="jn" cx="1176" cy="1076" r="3"/>
+<text class="pnum" x="1188" y="1046" text-anchor="start" dominant-baseline="central">n34</text>
+<circle class="jn" cx="1234" cy="1044" r="3"/>
+<line class="w" x1="1234" y1="1044" x2="1246" y2="1044"/>
+<circle class="term" cx="1248" cy="1044" r="2.4"/>
+<circle class="term" cx="1274" cy="1044" r="2.4"/>
+<line class="w" x1="1250" y1="1043" x2="1270" y2="1034"/>
+<line class="w" x1="1276" y1="1044" x2="1292" y2="1044"/>
+<line class="w" x1="1292" y1="1044" x2="1292" y2="1050"/>
+<polygon class="dio" points="1286,1050 1298,1050 1292,1070"/>
+<line class="w bar" x1="1286" y1="1070" x2="1298" y2="1070"/>
+<line class="w" x1="1292" y1="1070" x2="1292" y2="1076"/>
+<circle class="jn" cx="1292" cy="1076" r="3"/>
+<text class="pnum" x="1304" y="1046" text-anchor="start" dominant-baseline="central">n35</text>
+</svg></div>
+  <p class="hint">No celular, arraste o esquema para os lados.</p>
+</section>
+
+<div class="two">
+<section>
+  <h2>Mapa do painel</h2>
+  <p class="rule">O layout do seu desenho, com o que cada controle envia. n = nota MIDI, CC = control change.</p>
+  <div class="panel">
+    <div class="panel-left">
+      <div class="oled">E1: 90  P1: 64<br>E2: 90  P2: 12<br>E3: 90  P3:127<br>E4: 90  P4:  0</div>
+      <div class="faders"><div class="fader"><div class="track"><span class="cap" style="top:30%"></span></div><b>F1</b><small>A0 · CC30</small></div><div class="fader"><div class="track"><span class="cap" style="top:42%"></span></div><b>F2</b><small>A1 · CC31</small></div><div class="fader"><div class="track"><span class="cap" style="top:54%"></span></div><b>F3</b><small>A2 · CC32</small></div><div class="fader"><div class="track"><span class="cap" style="top:66%"></span></div><b>F4</b><small>A3 · CC33</small></div></div>
+    </div>
+    <div class="panel-right">
+      <div class="grid5"><div class="p-enc"><span class="dial"></span><b>E1</b><small>CC21</small><small>n1</small></div><div class="p-enc"><span class="dial"></span><b>E2</b><small>CC22</small><small>n2</small></div><div class="p-enc"><span class="dial"></span><b>E3</b><small>CC23</small><small>n3</small></div><div class="p-enc"><span class="dial"></span><b>E4</b><small>CC24</small><small>n4</small></div><div class="p-enc"><span class="dial"></span><b>E5</b><small>CC25</small><small>n5</small></div></div>
+      <div class="grid5"><div class="p-pad"><span>n6</span></div><div class="p-pad"><span>n7</span></div><div class="p-pad"><span>n8</span></div><div class="p-pad"><span>n9</span></div><div class="p-pad"><span>n10</span></div><div class="p-pad"><span>n11</span></div><div class="p-pad"><span>n12</span></div><div class="p-pad"><span>n13</span></div><div class="p-pad"><span>n14</span></div><div class="p-pad"><span>n15</span></div><div class="p-pad"><span>n16</span></div><div class="p-pad"><span>n17</span></div><div class="p-pad"><span>n18</span></div><div class="p-pad"><span>n19</span></div><div class="p-pad"><span>n20</span></div><div class="p-pad"><span>n21</span></div><div class="p-pad"><span>n22</span></div><div class="p-pad"><span>n23</span></div><div class="p-pad"><span>n24</span></div><div class="p-pad"><span>n25</span></div><div class="p-pad"><span>n26</span></div><div class="p-pad"><span>n27</span></div><div class="p-pad"><span>n28</span></div><div class="p-pad"><span>n29</span></div><div class="p-pad"><span>n30</span></div></div>
+      <div class="grid5"><div class="btn"><span class="oval"></span><small>n31</small></div><div class="btn"><span class="oval"></span><small>n32</small></div><div class="btn"><span class="oval"></span><small>n33</small></div><div class="btn"><span class="oval"></span><small>n34</small></div><div class="btn"><span class="oval"></span><small>n35</small></div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Material</h2>
+  <dl class="bom">
+    <dt>1</dt><dd>Arduino Pro Micro 5 V (ATmega32U4)</dd>
+    <dt>1</dt><dd>MCP23017 em encapsulamento DIP-28, com soquete</dd>
+    <dt>1</dt><dd>Display OLED 0,96" I²C, 4 pinos (SSD1306)</dd>
+    <dt>4</dt><dd>Faders 10 kΩ lineares (curva B)</dd>
+    <dt>5</dt><dd>Encoders EC11 com botão (5 pinos)</dd>
+    <dt>30</dt><dd>Botões: 25 pads e 5 botões inferiores</dd>
+    <dt>35</dt><dd>Diodos 1N4148, um por posição da matriz</dd>
+    <dt>1</dt><dd>Capacitor cerâmico 100 nF</dd>
+    <dt>2</dt><dd>Resistores 4,7 kΩ (só se o OLED não tiver pull-up)</dd>
+  </dl>
+  <h2>Antes de ligar na USB</h2>
+  <ul class="steps">
+    <li>Confira o pino 18 (RESET) do MCP23017 no VCC. Solto, o chip reinicia sozinho.</li>
+    <li>Diodos da matriz: a faixa fica do lado da linha (LIN). Invertidos, nenhum botão funciona.</li>
+    <li>Os pinos 0 e 1 do Pro Micro são usados pela matriz. Isso não atrapalha, porque a USB do 32U4 é separada da serial.</li>
+    <li>Se o OLED for de 1,3" e a imagem ficar deslocada, troque a linha do display no código para a versão SH1106.</li>
+    <li>GPA7 e GPB7 do MCP ficam livres de propósito. Nas revisões atuais do chip eles são só saída.</li>
+  </ul>
+</section>
+</div>
+
+<section>
+  <h2>Lista de fios</h2>
+  <p class="rule">Cada linha é uma rede do esquema e todos os pontos que ela liga. Use como checklist durante a montagem.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Rede</th><th>Liga</th><th>Observação</th></tr></thead>
+    <tbody><tr><td><span class="chip-net i2c">SDA</span></td><td>Pro Micro 2 · MCP23017 pino 13 · OLED SDA</td><td>Barramento I²C compartilhado</td></tr><tr><td><span class="chip-net i2c">SCL</span></td><td>Pro Micro 3 · MCP23017 pino 12 · OLED SCL</td><td>Barramento I²C compartilhado</td></tr><tr><td><span class="chip-net vcc">VCC</span></td><td>Pro Micro VCC · MCP23017 pinos 9 e 18 · OLED VCC · topo dos 4 faders · pull-ups · capacitor</td><td>5 V vindos da USB. O pino 18 (RESET) precisa ir no VCC</td></tr><tr><td><span class="chip-net gnd">GND</span></td><td>Pro Micro GND · MCP23017 pinos 10, 15, 16, 17 · OLED GND · base dos 4 faders · pino C dos 5 encoders · capacitor</td><td>Pinos 15–17 (A0–A2) no GND dão o endereço 0x20</td></tr><tr><td><span class="chip-net enc">E1A</span></td><td>MCP23017 pino 21 (GPA0) · encoder 1 pino A</td><td>Encoder 1, CC 21</td></tr><tr><td><span class="chip-net enc">E1B</span></td><td>MCP23017 pino 1 (GPB0) · encoder 1 pino B</td><td></td></tr><tr><td><span class="chip-net enc">E2A</span></td><td>MCP23017 pino 22 (GPA1) · encoder 2 pino A</td><td>Encoder 2, CC 22</td></tr><tr><td><span class="chip-net enc">E2B</span></td><td>MCP23017 pino 2 (GPB1) · encoder 2 pino B</td><td></td></tr><tr><td><span class="chip-net enc">E3A</span></td><td>MCP23017 pino 23 (GPA2) · encoder 3 pino A</td><td>Encoder 3, CC 23</td></tr><tr><td><span class="chip-net enc">E3B</span></td><td>MCP23017 pino 3 (GPB2) · encoder 3 pino B</td><td></td></tr><tr><td><span class="chip-net enc">E4A</span></td><td>MCP23017 pino 24 (GPA3) · encoder 4 pino A</td><td>Encoder 4, CC 24</td></tr><tr><td><span class="chip-net enc">E4B</span></td><td>MCP23017 pino 4 (GPB3) · encoder 4 pino B</td><td></td></tr><tr><td><span class="chip-net enc">E5A</span></td><td>MCP23017 pino 25 (GPA4) · encoder 5 pino A</td><td>Encoder 5, CC 25</td></tr><tr><td><span class="chip-net enc">E5B</span></td><td>MCP23017 pino 5 (GPB4) · encoder 5 pino B</td><td></td></tr><tr><td><span class="chip-net ana">FD1</span></td><td>Pro Micro A0 (pino 18) · cursor do fader 1</td><td>CC 30</td></tr><tr><td><span class="chip-net ana">FD2</span></td><td>Pro Micro A1 (pino 19) · cursor do fader 2</td><td>CC 31</td></tr><tr><td><span class="chip-net ana">FD3</span></td><td>Pro Micro A2 (pino 20) · cursor do fader 3</td><td>CC 32</td></tr><tr><td><span class="chip-net ana">FD4</span></td><td>Pro Micro A3 (pino 21) · cursor do fader 4</td><td>CC 33</td></tr><tr><td><span class="chip-net row">LIN1</span></td><td>Pro Micro 0 · lado da faixa (catodo) dos diodos da linha 1</td><td>Botões dos 5 encoders (notas 1–5)</td></tr><tr><td><span class="chip-net row">LIN2</span></td><td>Pro Micro 1 · lado da faixa (catodo) dos diodos da linha 2</td><td>Pads da 1ª fileira (notas 6–10)</td></tr><tr><td><span class="chip-net row">LIN3</span></td><td>Pro Micro 4 · lado da faixa (catodo) dos diodos da linha 3</td><td>Pads da 2ª fileira (notas 11–15)</td></tr><tr><td><span class="chip-net row">LIN4</span></td><td>Pro Micro 5 · lado da faixa (catodo) dos diodos da linha 4</td><td>Pads da 3ª fileira (notas 16–20)</td></tr><tr><td><span class="chip-net row">LIN5</span></td><td>Pro Micro 6 · lado da faixa (catodo) dos diodos da linha 5</td><td>Pads da 4ª fileira (notas 21–25)</td></tr><tr><td><span class="chip-net row">LIN6</span></td><td>Pro Micro 7 · lado da faixa (catodo) dos diodos da linha 6</td><td>Pads da 5ª fileira (notas 26–30)</td></tr><tr><td><span class="chip-net row">LIN7</span></td><td>Pro Micro 8 · lado da faixa (catodo) dos diodos da linha 7</td><td>Botões de baixo (notas 31–35)</td></tr><tr><td><span class="chip-net col">COL1</span></td><td>Pro Micro 9 · um lado de cada botão da coluna 1 · SW do encoder 1</td><td></td></tr><tr><td><span class="chip-net col">COL2</span></td><td>Pro Micro 10 · um lado de cada botão da coluna 2 · SW do encoder 2</td><td></td></tr><tr><td><span class="chip-net col">COL3</span></td><td>Pro Micro 14 · um lado de cada botão da coluna 3 · SW do encoder 3</td><td></td></tr><tr><td><span class="chip-net col">COL4</span></td><td>Pro Micro 15 · um lado de cada botão da coluna 4 · SW do encoder 4</td><td></td></tr><tr><td><span class="chip-net col">COL5</span></td><td>Pro Micro 16 · um lado de cada botão da coluna 5 · SW do encoder 5</td><td></td></tr></tbody>
+  </table></div>
+</section>
+</div>
+
+</body>
+</html>

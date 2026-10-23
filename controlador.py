@@ -29,6 +29,21 @@ ARQ_CONFIG = os.path.join(PASTA, "config.json")
 ARQ_INDEX = os.path.join(PASTA_RECURSOS, "web", "index.html")
 ARQ_LOG = os.path.join(PASTA, "erro.log")
 
+
+def _ler_edicao():
+    """edicao.json (junto da tela) dá outro nome, porta e padrões a um .exe.
+    É como o "Controlador MIDI 7x5" roda ao lado do original sem um atrapalhar o outro."""
+    try:
+        with open(os.path.join(PASTA_RECURSOS, "edicao.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+EDICAO = _ler_edicao()
+TITULO = EDICAO.get("titulo", "Controlador MIDI")
+PORTA = int(EDICAO.get("porta", PORTA))
+
 PASTA_EXPORTADOS = os.path.join(PASTA, "Perfis exportados")
 FORMATO_EXPORT = "controlador-midi-perfis"
 
@@ -43,6 +58,10 @@ CONFIG_PADRAO = {
     "ativo": True,
     "selecionar_ao_apertar": False,   # apertar no controlador abre o painel daquela tecla
     "barra_volume": True,             # barra flutuante no canto da tela ao girar/apertar um encoder de volume
+    # Qual aparelho está ligado (a tela desenha cada um do seu jeito; ver MODELOS no index.html):
+    #   "original" = 4 knobs + 16 teclas (matriz 5x4)
+    #   "7x5"      = display + 4 faders (CC 30..33) + 5 knobs (CC 21..25) + 25 teclas + 5 botões redondos (matriz 7x5)
+    "modelo": "original",
     "calibrado": False,
     "layout": [21, 22, 23, 24],   # CC do knob em cada posição física (cima-esq., cima-dir., baixo-meio, baixo-dir.)
     "botoes": {"cc:21": 17, "cc:22": 18, "cc:23": 19, "cc:24": 20},   # nota do botão de cada knob
@@ -62,6 +81,11 @@ CONFIG_PADRAO = {
         },
     },
 }
+
+CONFIG_PADRAO.update(EDICAO.get("padrao", {}))
+
+# Notas que o aparelho manda mas que ficaram sem uso (o 5º botão redondo do 7x5 ficou dentro da caixa)
+NOTAS_DESATIVADAS = {"7x5": (35,)}
 
 
 # Funções de encoder que mexem num volume (valor absoluto do knob -> volume)
@@ -320,12 +344,20 @@ class Controlador:
             return {"tipo": "mudo_microfone", "valor": encoder.get("valor", "")}
         return {}
 
+    def _acao_mudo_fader(self, chave_fader):
+        """'Mudo do fader' (botões do 7x5): o mudo do que aquele fader controla."""
+        fader = self.config["controles"].get(chave_fader or "") or {}
+        return self._acao_do_botao({**fader, "botao": {"tipo": "mudo_encoder"}})
+
     def _ao_receber(self, tipo, numero, valor):
+        if tipo != "cc" and numero in NOTAS_DESATIVADAS.get(self.config.get("modelo", "original"), ()):
+            return
         with self.trava:
             # Correções do aparelho, antes de tudo: o resto do programa só vê o sinal já certo
             if tipo == "cc" and numero in self.config.get("invertidos", []):
                 valor = 127 - valor
-            elif tipo != "cc" and self.config.get("teclas_invertidas") and 1 <= numero <= 16:
+            elif (tipo != "cc" and self.config.get("teclas_invertidas") and 1 <= numero <= 16
+                  and self.config.get("modelo", "original") == "original"):   # ajuste só do aparelho original
                 numero = 17 - numero
             chave = f"{'cc' if tipo == 'cc' else 'note'}:{numero}"
             dono = self._encoder_do_botao(numero) if tipo != "cc" else None
@@ -339,6 +371,9 @@ class Controlador:
                 acao = self._acao_do_botao(self.config["controles"].get(dono) or {})
             else:
                 acao = self.config["controles"].get(chave)
+                if acao and acao.get("tipo") == "mudo_fader":    # botão que muta o fader escolhido
+                    dono = acao.get("valor") or None             # (o OSD do mudo segue esse fader)
+                    acao = self._acao_mudo_fader(dono)
             ativo = self.config.get("ativo", True)
         if not ativo or not acao:
             return
@@ -375,6 +410,7 @@ class Controlador:
                 "mudos": self.mudos,
                 "seq": self.seq,
                 "midia": acoes.MIDIA,
+                "titulo": TITULO,
             }
 
     def eventos_desde(self, n):
@@ -474,6 +510,8 @@ class Handler(BaseHTTPRequestHandler):
                 acao = dados.get("acao") or {}
                 if dados.get("encoder"):    # testar o botão de um encoder
                     acao = self._acao_teste_encoder(dados["encoder"])
+                if acao.get("tipo") == "mudo_fader":
+                    acao = CTRL._acao_mudo_fader(acao.get("valor"))
                 if acao.get("tipo") == "atalho":
                     acoes.interpretar_atalho(acao.get("valor", ""))   # valida antes
                 if acao.get("tipo") == "perfil":
@@ -519,7 +557,7 @@ def _log_erro(texto):
 
 def _aviso(texto):
     import ctypes
-    ctypes.windll.user32.MessageBoxW(None, texto, "Controlador MIDI", 0x40)   # ícone de informação
+    ctypes.windll.user32.MessageBoxW(None, texto, TITULO, 0x40)   # ícone de informação
 
 
 def main():
@@ -550,7 +588,7 @@ def main():
     CTRL.midi.iniciar()
     servidor = ThreadingHTTPServer(("127.0.0.1", PORTA), Handler)
     threading.Thread(target=servidor.serve_forever, daemon=True).start()
-    print(f"Controlador MIDI rodando em {url}")
+    print(f"{TITULO} rodando em {url}")
 
     if "--sem-janela" in sys.argv:
         try:
@@ -596,7 +634,7 @@ def _hwnd_da_janela():
             titulo, classe = ctypes.create_unicode_buffer(256), ctypes.create_unicode_buffer(256)
             _user32.GetWindowTextW(hwnd, titulo, 256)
             _user32.GetClassNameW(hwnd, classe, 256)
-            if titulo.value == "Controlador MIDI" and classe.value.startswith("WindowsForms"):
+            if titulo.value == TITULO and classe.value.startswith("WindowsForms"):
                 achado.append(hwnd)
                 return False
         return True
@@ -647,13 +685,13 @@ def abrir_com_bandeja(url, comecar_escondido=False):
             _user32.PostMessageW(h, WM_CLOSE, 0, 0)    # o evento closing vê `sair` e deixa fechar
 
     MOSTRAR_JANELA = abrir
-    bandeja = Bandeja("Controlador MIDI", os.path.join(PASTA_RECURSOS, "icone.ico"),
+    bandeja = Bandeja(TITULO, os.path.join(PASTA_RECURSOS, "icone.ico"),
                       ao_abrir=abrir, ao_fechar=fechar, ao_alternar_ativo=alternar_ativo,
                       esta_ativo=lambda: CTRL.config.get("ativo", True))
     bandeja.iniciar()
     try:
         import webview
-        janela = webview.create_window("Controlador MIDI", url, width=1100, height=760,
+        janela = webview.create_window(TITULO, url, width=1100, height=760,
                                        min_size=(380, 460), hidden=comecar_escondido)
         estado["janela"] = janela
 

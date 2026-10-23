@@ -1,0 +1,97 @@
+{
+  "titulo": "Controlador MIDI 7x5",
+  "porta": 8801,
+  "padrao": {
+    "modelo": "7x5",
+    "calibrado": true,
+    "layout": [
+      21,
+      22,
+      23,
+      24,
+      25
+    ],
+    "botoes": {
+      "cc:21": 1,
+      "cc:22": 2,
+      "cc:23": 3,
+      "cc:24": 4,
+      "cc:25": 5
+    },
+    "perfil_ativo": "Padrão",
+    "perfis": {
+      "Padrão": {
+        "cc:21": {
+          "tipo": "nenhum",
+          "botao": {
+            "tipo": "mudo_encoder"
+          }
+        },
+        "cc:22": {
+          "tipo": "nenhum",
+          "botao": {
+            "tipo": "mudo_encoder"
+          }
+        },
+        "cc:23": {
+          "tipo": "nenhum",
+          "botao": {
+            "tipo": "mudo_encoder"
+          }
+        },
+        "cc:24": {
+          "tipo": "nenhum",
+          "botao": {
+            "tipo": "mudo_encoder"
+          }
+        },
+        "cc:25": {
+          "tipo": "nenhum",
+          "botao": {
+            "tipo": "mudo_encoder"
+          }
+        },
+        "cc:30": {
+          "nome": "Volume geral",
+          "tipo": "volume_sistema"
+        },
+        "note:6": {
+          "nome": "Play / pause",
+          "tipo": "midia",
+          "valor": "playpause"
+        },
+        "note:7": {
+          "nome": "Próxima",
+          "tipo": "midia",
+          "valor": "next"
+        },
+        "note:8": {
+          "nome": "Anterior",
+          "tipo": "midia",
+          "valor": "prev"
+        },
+        "note:9": {
+          "nome": "Mudo",
+          "tipo": "midia",
+          "valor": "mute"
+        },
+        "note:31": {
+          "tipo": "mudo_fader",
+          "valor": "cc:30"
+        },
+        "note:32": {
+          "tipo": "mudo_fader",
+          "valor": "cc:31"
+        },
+        "note:33": {
+          "tipo": "mudo_fader",
+          "valor": "cc:32"
+        },
+        "note:34": {
+          "tipo": "mudo_fader",
+          "valor": "cc:33"
+        }
+      }
+    }
+  }
+}

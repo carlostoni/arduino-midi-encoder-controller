@@ -53,9 +53,80 @@
   .painel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--suave);
                margin: 0 0 12px; font-weight: 600; }
 
-  /* mesma disposição do aparelho: knobs em zigue-zague (os de índice 2 e 3 ficam mais baixos) */
-  .encoders { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; padding-bottom: 30px; }
+  /* mesma disposição do aparelho: no original os knobs ficam em zigue-zague (índices 2 e 3 mais baixos) */
+  .encoders { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+  .encoders.zigzag { padding-bottom: 30px; }
   .encoders .baixo { transform: translateY(30px); }
+  .tecla.cor4 { border-top-color: #8e4ec6; }
+
+  /* "hidden" tem que ganhar dos display: flex/grid abaixo (senão o Original continuava mostrando
+     o display e os faders do 7x5) */
+  [hidden] { display: none !important; }
+
+  /* 7x5: display + faders à esquerda, knobs/teclas/redondos à direita */
+  main:has(.aparelho.com-lado) { max-width: 1180px; }
+  .aparelho.com-lado { display: grid; grid-template-columns: minmax(190px, .5fr) 1fr; gap: 20px; align-items: start; }
+  .lado { display: flex; flex-direction: column; }
+  .oled { margin: 0 0 16px; padding: 12px 10px; border-radius: 8px; background: #05070a; color: #7fd6ff;
+          border: 6px solid #202329; font: 12px/1.45 Consolas, "Cascadia Mono", monospace; white-space: pre;
+          overflow: hidden; min-height: 150px; }
+  .faders { display: grid; gap: 10px; }
+  .fader { padding: 8px 4px 10px; display: flex; flex-direction: column; align-items: center; }
+  .fader .nome { font-size: 12px; max-width: 100%; margin-top: 10px; }
+  .fader .icone { position: absolute; top: 4px; right: 5px; font-size: 13px; }
+  .fader .icone img { width: 16px; height: 16px; }
+  .corpo-fader { display: flex; flex-direction: column; align-items: center; margin-top: 8px; width: 100%; }
+  .trilho-fader { position: relative; width: 10px; height: clamp(170px, 32vh, 300px); border-radius: 5px;
+                  background: var(--tecla-borda); }
+  .trilho-fader .cheio { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 5px; background: var(--acento);
+                         transition: height .08s; }
+  .trilho-fader .pino { position: absolute; left: 50%; width: 34px; height: 14px; margin: 0 0 -7px -17px; border-radius: 4px;
+                        background: var(--painel); border: 2px solid var(--texto); transition: bottom .08s; }
+  .valor-fader { font-weight: 600; margin-top: 8px; font-size: 13px; }
+  .fader.colorida .trilho-fader { background: color-mix(in srgb, var(--cor-texto) 28%, transparent); }
+  .fader.colorida .cheio { background: var(--cor-texto); }
+  .fader.mudo .cheio { background: var(--erro); }
+  .redondos { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 16px; }
+  /* Alinhamento com o lado direito (como no desenho): uma grade só, com as duas colunas
+     dividindo as mesmas linhas. O display ocupa a altura do título + knobs; faders e botões
+     ocupam a altura dos pads, e os botões ficam na altura da última fileira de pads. */
+  .aparelho.com-lado { grid-template-rows: auto auto auto 1fr; row-gap: 0; align-items: stretch; }
+  .aparelho.com-lado .lado, .aparelho.com-lado .centro { display: contents; }
+  .aparelho.com-lado .oled { grid-column: 1; grid-row: 1 / span 2; margin: 0; min-height: 0; }
+  .aparelho.com-lado .titulo-encoders { grid-column: 2; grid-row: 1; }
+  .aparelho.com-lado #encoders { grid-column: 2; grid-row: 2; margin-bottom: 0; }
+  .aparelho.com-lado .titulo-faders { grid-column: 1; grid-row: 3; margin-top: 22px; }
+  .aparelho.com-lado .titulo-teclas { grid-column: 2; grid-row: 3; margin-top: 22px; }
+  .aparelho.com-lado #teclas { grid-column: 2; grid-row: 4; }
+  .aparelho.com-lado #redondos { grid-column: 2; grid-row: 5; }
+  .aparelho.com-lado .coluna-faders { grid-column: 1; grid-row: 4; display: flex; flex-direction: column; min-height: 0; }
+  .coluna-faders .faders { flex: 1; min-height: 0; }
+  .coluna-faders .fader { height: 100%; box-sizing: border-box; }
+  .coluna-faders .corpo-fader { flex: 1; min-height: 0; }
+  .coluna-faders .trilho-fader { flex: 1; height: auto; min-height: 90px; }
+  .lado-redondos { gap: 10px; margin-top: 10px; }
+  .tecla.redondo.mudo { border-color: var(--erro); box-shadow: inset 0 0 0 2px var(--erro); }    /* mesmo espaço que entre as fileiras de pads */
+  /* a faixa continua com a altura de um pad (alinhada à última fileira); o botão é um círculo
+     menor, centralizado nela e embaixo do seu fader */
+  .lado-redondos { height: var(--altura-pad, 64px); align-items: center; justify-items: center; }
+  .lado-redondos .tecla.redondo { width: min(100%, calc(var(--altura-pad, 64px) * .62)); height: auto; aspect-ratio: 1;
+                                  min-height: 0; padding: 0; border-radius: 50%; border-width: 1px;
+                                  display: flex; align-items: center; justify-content: center; }
+  .lado-redondos .tecla.redondo .num { display: none; }
+  .lado-redondos .tecla.redondo .icone { display: none; }
+  .lado-redondos .tecla.redondo .tipo { display: none; }
+  .lado-redondos .tecla.redondo .nome { font-size: 10.5px; padding: 0 2px; line-height: 1.1; }
+  .tecla.redondo { aspect-ratio: auto; border-radius: 999px; border-top-width: 1px; padding: 8px 6px; min-height: 52px; }
+  @media (max-width: 760px) {          /* janela estreita: o lado esquerdo vai para cima, sem alinhar */
+    .aparelho.com-lado { display: block; }
+    .aparelho.com-lado .lado { display: flex; flex-direction: column; margin-bottom: 18px; }
+    .aparelho.com-lado .centro { display: block; }
+    .aparelho.com-lado .oled { margin-bottom: 14px; min-height: 120px; }
+    .aparelho.com-lado .titulo-faders { margin-top: 0; }
+    .aparelho.com-lado #encoders { margin-bottom: 22px; }
+    .aparelho.com-lado .titulo-teclas { margin-top: 0; }
+    .coluna-faders .trilho-fader, .trilho-fader { flex: none; height: 150px; }
+  }
   .ctrl.alvo { border-color: var(--aceso); box-shadow: 0 0 0 3px var(--aceso); animation: pulsa 1s infinite; }
   @keyframes pulsa { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--aceso) 35%, transparent); } }
   .tecla { border-top-width: 5px; }
@@ -194,6 +265,7 @@
   <div class="status"><span class="ponto" id="ponto"></span><span id="status-txt">Procurando…</span></div>
   <select id="dispositivo" title="Qual entrada MIDI usar"></select>
   <div class="espaco"></div>
+  <select id="modelo" title="Qual controlador está ligado (muda o desenho da tela)"></select>
   <button id="bt-calibrar" title="Ensina ao programa onde fica cada encoder e o botão de cada um">🎯 Calibrar</button>
   <label class="chk" title="Ao apertar uma tecla no controlador, ela fica selecionada para editar">
     <input type="checkbox" id="seguir"> Selecionar ao apertar</label>
@@ -227,22 +299,69 @@
 <div class="aviso" id="aviso-midi" style="margin-top:12px"></div>
 <div class="aviso erro" id="aviso-erro" style="margin-top:12px"></div>
 
+<div class="aviso" id="aviso-modelo" style="margin-top:12px"></div>
+
 <main>
-  <section class="painel">
-    <h2>Encoders</h2>
-    <div class="encoders" id="encoders"></div>
-    <h2>Teclas</h2>
-    <div class="teclas" id="teclas"></div>
+  <section class="painel aparelho" id="aparelho">
+    <div class="lado" id="lado" hidden>
+      <pre class="oled" id="oled" title="O que o display do aparelho está mostrando"></pre>
+      <h2 class="titulo-faders">Faders</h2>
+      <div class="coluna-faders">
+        <div class="faders" id="faders"></div>
+        <div class="redondos lado-redondos" id="redondos-lado" hidden></div>
+      </div>
+    </div>
+    <div class="centro">
+      <h2 class="titulo-encoders">Encoders</h2>
+      <div class="encoders" id="encoders"></div>
+      <h2 class="titulo-teclas">Teclas</h2>
+      <div class="teclas" id="teclas"></div>
+      <div class="redondos" id="redondos" hidden></div>
+    </div>
   </section>
 </main>
 <section class="painel editor" id="editor"></section>
 
 <script>
-const ENCODERS = [21, 22, 23, 24];                   // CC de cada encoder (firmware)
-const TECLAS = Array.from({length: 20}, (_, i) => i + 1);   // notas 1..20 (matriz 5x4 = 16 teclas + 4 botões de encoder)
-// Posições dos knobs no aparelho: 0 = cima-esq., 1 = cima-dir., 2 = baixo-meio, 3 = baixo-dir.
-// Na tela ficam na ordem 0, 2, 1, 3 (zigue-zague).
-const ORDEM_VISUAL = [0, 2, 1, 3];
+// Os aparelhos que o programa sabe desenhar (cfg.modelo). Tudo o que depende do hardware sai daqui.
+const MODELOS = {
+  original: {
+    nome: "Original — 4 knobs + 16 teclas",
+    encoders: [21, 22, 23, 24],          // CC de cada encoder (firmware)
+    notas: 20,                           // matriz 5x4 = 16 teclas + 4 botões dos knobs
+    grade: 16, colunas: 4,               // teclas quadradas
+    redondos: false,                     // nota que sobrar vira fileira extra cinza na grade
+    faders: [], display: false,
+    // posições dos knobs: 0 = cima-esq., 1 = cima-dir., 2 = baixo-meio, 3 = baixo-dir. (zigue-zague)
+    ordemVisual: [0, 2, 1, 3], zigzag: true,
+    lugar: ["de cima, à esquerda", "de cima, à direita", "de baixo, no meio", "de baixo, à direita"],
+    botoes: {"cc:21": 17, "cc:22": 18, "cc:23": 19, "cc:24": 20},
+    teclasInvertiveis: true,
+  },
+  "7x5": {
+    nome: "7x5 — display, 4 faders, 5 knobs, 29 botões",
+    encoders: [21, 22, 23, 24, 25],      // no MCP23017
+    notas: 35,                           // matriz 7x5 = 5 botões dos knobs + 25 teclas + 5 redondos
+    // o 5º botão redondo (nota 35) ficou dentro da caixa, desativado: some da tela e o servidor ignora
+    desativadas: [35],
+    grade: 25, colunas: 5,
+    redondos: true,                      // as notas depois da grade (31..34) = botões redondos
+    redondosNoLado: true,                // ...que ficam embaixo dos faders, um por fader
+    faders: [30, 31, 32, 33],            // potenciômetros deslizantes A0..A3
+    display: true,                       // OLED: o próprio Arduino mostra E1..E5 e P1..P4
+    ordemVisual: [0, 1, 2, 3, 4], zigzag: false,
+    lugar: ["1º da esquerda", "2º da esquerda", "do meio", "4º da esquerda", "da direita"],
+    // do esquema (firmware/ControladorMIDI_7x5): SW dos knobs na linha 1 da matriz = notas 1..5,
+    // pads = notas 6..30, botões de baixo = 31..35
+    botoes: {"cc:21": 1, "cc:22": 2, "cc:23": 3, "cc:24": 4, "cc:25": 5},
+    calibradoDeFabrica: true,            // fiação documentada: não precisa calibrar para começar
+    teclasInvertiveis: false,
+  },
+};
+const M = () => MODELOS[cfg.modelo] || MODELOS.original;
+const notasDoModelo = () => Array.from({length: M().notas}, (_, i) => i + 1)
+  .filter(n => !(M().desativadas || []).includes(n));
+const ehFader = num => M().faders.includes(num);
 
 const TIPOS_TECLA = {
   nenhum: "Nada", midia: "Mídia / volume", atalho: "Atalho de teclado",
@@ -252,6 +371,20 @@ const TIPOS_TECLA = {
 const TIPOS_ENCODER = {
   nenhum: "Nada", volume_sistema: "Volume geral do Windows",
   volume_app: "Volume de um programa", volume_microfone: "Volume do microfone", direcao: "Uma função para cada lado",
+};
+
+// Botões redondos do 7x5 (embaixo dos faders): tudo o que uma tecla faz + mutar um fader
+const TIPOS_REDONDO = {nenhum: "Nada", mudo_fader: "Mudo de um fader (o de cima, por padrão)",
+  ...Object.fromEntries(Object.entries(TIPOS_TECLA).filter(([k]) => k !== "nenhum"))};
+// Fader que fica em cima do botão redondo "note:N" (o 1º botão fica embaixo do F1, e assim por diante)
+function faderDeCima(k) {
+  const livres = teclasLivres(), i = livres.indexOf(+String(k).split(":")[1]) - M().grade;
+  return i >= 0 && i < M().faders.length ? "cc:" + M().faders[i] : "";
+}
+
+const TIPOS_FADER = {
+  nenhum: "Nada", volume_sistema: "Volume geral do Windows",
+  volume_app: "Volume de um programa", volume_microfone: "Volume do microfone",
 };
 
 const TIPOS_BOTAO_ENCODER = {nenhum: "Nada", mudo_encoder: "Mudo do que o encoder controla",
@@ -289,6 +422,8 @@ function resumo(a) {
     case "direcao": return [resumo(a.esquerda) || "—", resumo(a.direita) || "—"].join(" ⟷ ");
     case "mudo_encoder": return "Mudo";
     case "perfil": return a.valor ? "Perfil " + a.valor : "Próximo perfil";
+    case "mudo_fader": { const i = M().faders.indexOf(+String(a.valor || "").split(":")[1]);
+                         return i >= 0 ? `Mudo do F${i + 1}` : "Mudo de um fader"; }
     case "saida_som": return a.valor || a.saida ? "Som: " + nomeCurtoSaida(a.saida) : "Próxima saída de som";
   }
   return "";
@@ -418,31 +553,155 @@ async function ligarIconeApp(a, caixa, mudou, desenha) {
 }
 const chaveApp = s => String(s).replace(/"/g, "").trim().split(/[\\/]/).pop().toLowerCase().replace(/\.(exe|lnk)$/, "");
 
-const layout = () => (cfg.layout && cfg.layout.length === 4 ? cfg.layout : ENCODERS);
-const numEncoder = cc => layout().indexOf(cc) + 1;             // nº físico (E1..E4) do CC
-const teclasLivres = () => { const d = donosDosBotoes(); return TECLAS.filter(n => !d["note:" + n]); };
+const layout = () => (cfg.layout && cfg.layout.length === M().encoders.length ? cfg.layout : M().encoders);
+const numEncoder = cc => layout().indexOf(cc) + 1;             // nº físico (E1..En) do CC
+const teclasLivres = () => { const d = donosDosBotoes(); return notasDoModelo().filter(n => !d["note:" + n]); };
+// Botões redondos (7x5): as notas livres depois da grade de teclas
+const ehRedondo = num => M().redondos && teclasLivres().indexOf(num) >= M().grade;
 
 function desenhar() {
-  $("#encoders").innerHTML = ORDEM_VISUAL.map(pos => {
+  const m = M();
+  $("#aparelho").classList.toggle("com-lado", m.faders.length > 0 || m.display);
+  $("#encoders").classList.toggle("zigzag", m.zigzag);
+  $("#encoders").style.gridTemplateColumns = `repeat(${m.encoders.length}, 1fr)`;
+  $("#teclas").style.gridTemplateColumns = `repeat(${m.colunas}, 1fr)`;
+  $("#encoders").innerHTML = m.ordemVisual.map(pos => {
     const cc = layout()[pos], k = "cc:" + cc, a = cfg.controles[k] || {};
     const b = a.botao && (cfg.botoes || {})[k] != null && resumo(a.botao) ? " · aperta: " + resumo(a.botao) : "";
     const alvo = calib && calib.passo === pos ? "alvo" : "";
     const p = pintura(a);
-    return `<div class="ctrl ${p.cls} ${pos >= 2 ? "baixo" : ""} ${mudos[k] ? "mudo" : ""} ${alvo} ${selecionado === k ? "sel" : ""} ${a.tipo && a.tipo !== "nenhum" ? "" : "vazio"}" data-k="${k}" ${p.style}>
+    return `<div class="ctrl ${p.cls} ${m.zigzag && pos >= 2 ? "baixo" : ""} ${mudos[k] ? "mudo" : ""} ${alvo} ${selecionado === k ? "sel" : ""} ${a.tipo && a.tipo !== "nenhum" ? "" : "vazio"}" data-k="${k}" ${p.style}>
       <span class="num">E${pos + 1}</span>${knobSVG(valores[k])}${iconeHTML(a)}
       <div class="nome">${esc(a.nome || "Encoder " + (pos + 1))}</div>
       <div class="tipo" title="${esc((resumo(a) || "sem função") + b)}">${esc((resumo(a) || "sem função") + b)}</div></div>`;
   }).join("");
-  // As 16 teclas físicas (4x4, uma cor por fileira). Se sobrar nota (botões dos encoders
-  // ainda não identificados), ela aparece numa fileira extra cinza.
-  $("#teclas").innerHTML = teclasLivres().map((n, i) => {
+  // Teclas: a grade (uma cor por fileira). O que sobrar vira os botões redondos (7x5)
+  // ou, no original, uma fileira extra cinza (botões dos knobs ainda não identificados).
+  const livres = teclasLivres();
+  const naGrade = m.redondos ? livres.slice(0, m.grade) : livres;
+  const tecla = (n, i, extra = "") => {
     const k = "note:" + n, a = cfg.controles[k] || {}, p = pintura(a);
-    return `<div class="ctrl tecla ${p.cls} cor${Math.floor(i / 4)} ${selecionado === k ? "sel" : ""} ${a.tipo && a.tipo !== "nenhum" ? "" : "vazio"}" data-k="${k}" ${p.style}>
+    const rotulo = extra ? "Botão " + (i + 1) : "Tecla " + (i + 1);
+    if (extra && !a.nome && a.tipo === "mudo_fader") {       // botão pequeno: "🔇 F1" cabe, "Mudo do F1" não
+      const f = M().faders.indexOf(+String(a.valor || "").split(":")[1]);
+      return `<div class="ctrl tecla ${extra} ${mudos[a.valor] ? "mudo" : ""} ${p.cls} ${selecionado === k ? "sel" : ""}" data-k="${k}" ${p.style}
+          title="${esc(resumo(a))}"><span class="num">${i + 1}</span>${iconeHTML(a)}
+        <div class="nome">🔇 ${f >= 0 ? "F" + (f + 1) : "?"}</div></div>`;
+    }
+    const mutaFader = a.tipo === "mudo_fader" && mudos[a.valor] ? "mudo" : "";
+    return `<div class="ctrl tecla ${extra} ${mutaFader} ${p.cls} ${extra ? "" : "cor" + Math.floor(i / m.colunas)} ${selecionado === k ? "sel" : ""} ${a.tipo && a.tipo !== "nenhum" ? "" : "vazio"}" data-k="${k}" ${p.style}>
       <span class="num">${i + 1}</span>${iconeHTML(a)}
-      <div class="nome">${esc(a.nome || (a.tipo && a.tipo !== "nenhum" ? resumo(a) : "Tecla " + (i + 1)))}</div>
+      <div class="nome">${esc(a.nome || (a.tipo && a.tipo !== "nenhum" ? resumo(a) : rotulo))}</div>
       <div class="tipo">${esc(a.nome ? resumo(a) : (a.tipo && a.tipo !== "nenhum" ? "" : "sem função"))}</div></div>`;
-  }).join("");
+  };
+  $("#teclas").innerHTML = naGrade.map((n, i) => tecla(n, i)).join("");
+  const redondos = m.redondos ? livres.slice(m.grade).map((n, i) => tecla(n, i, "redondo")).join("") : "";
+  $("#redondos").innerHTML = m.redondosNoLado ? "" : redondos;
+  $("#redondos").hidden = !m.redondos || m.redondosNoLado;
+  $("#redondos-lado").innerHTML = m.redondosNoLado ? redondos : "";
+  $("#redondos-lado").hidden = !m.redondosNoLado;
+  $("#redondos-lado").style.gridTemplateColumns = `repeat(${Math.max(m.faders.length, 1)}, 1fr)`;
+  desenharLado();
   document.querySelectorAll(".ctrl").forEach(el => el.onclick = () => selecionar(el.dataset.k));
+  medirPad();
+}
+
+// Os botões embaixo dos faders têm a altura de um pad, para ficarem na linha da última fileira
+function medirPad() {
+  const pad = document.querySelector("#teclas .ctrl");
+  if (pad) $("#aparelho").style.setProperty("--altura-pad", pad.offsetHeight + "px");
+}
+new ResizeObserver(medirPad).observe(document.querySelector("#teclas"));
+
+// ---------------- modelo do aparelho ----------------
+function preencherModelos() {
+  $("#modelo").innerHTML = Object.entries(MODELOS).map(([k, m]) =>
+    `<option value="${k}" ${k === (cfg.modelo || "original") ? "selected" : ""}>${esc(m.nome)}</option>`).join("");
+}
+
+// Trocar de aparelho: volta a posição e os botões dos knobs ao palpite daquele modelo e pede calibração.
+// As funções das teclas (perfis) ficam como estão: nota 1 continua sendo nota 1.
+async function trocarModelo(modelo) {
+  if (!MODELOS[modelo] || modelo === (cfg.modelo || "original")) return;
+  const m = MODELOS[modelo];
+  cfg.modelo = modelo;
+  cfg.layout = [...m.encoders];
+  cfg.botoes = {...m.botoes};
+  cfg.calibrado = !!m.calibradoDeFabrica;
+  for (const cc of m.encoders) {            // knobs novos já nascem com o botão = mudo
+    const a = cfg.controles["cc:" + cc] || (cfg.controles["cc:" + cc] = {tipo: "nenhum"});
+    if (!a.botao) a.botao = {tipo: "mudo_encoder"};
+  }
+  if (m.redondosNoLado)                     // botão embaixo de cada fader = mudo daquele fader
+    teclasLivres().slice(m.grade).forEach((n, i) => {
+      const a = cfg.controles["note:" + n];
+      if ((!a || !a.tipo || a.tipo === "nenhum") && m.faders[i])
+        cfg.controles["note:" + n] = {...(a || {}), tipo: "mudo_fader", valor: "cc:" + m.faders[i]};
+    });
+  await api("/api/config", {modelo, layout: cfg.layout, botoes: cfg.botoes, calibrado: cfg.calibrado,
+                            controles: cfg.controles, perfil: cfg.perfil_ativo});
+  sugestaoModelo = null;
+  if (selecionado) fecharEditor();
+  preencherModelos(); avisoModelo(); avisoCalib(); desenhar();
+  toast(`Aparelho: ${m.nome}`);
+}
+
+// Chegou um sinal que só existe no outro aparelho (CC 25, faders, notas 21..35)? Oferece trocar.
+let sugestaoModelo = null, modeloRecusado = false;
+function sugerirModelo(ev) {
+  if (modeloRecusado || sugestaoModelo || (cfg.modelo || "original") !== "original") return;
+  const [t, n] = ev.chave.split(":"), num = +n;
+  if ((t === "cc" && (num === 25 || MODELOS["7x5"].faders.includes(num))) || (t === "note" && num > 20 && num <= 35)) {
+    sugestaoModelo = "7x5"; avisoModelo();
+  }
+}
+function avisoModelo() {
+  const av = $("#aviso-modelo");
+  av.classList.toggle("mostra", !!sugestaoModelo);
+  if (!sugestaoModelo) return;
+  av.innerHTML = `Este controlador parece ser o <b>${esc(MODELOS[sugestaoModelo].nome)}</b>.
+    <button class="primario" id="modelo-sim">Usar este layout</button><button id="modelo-nao">Agora não</button>`;
+  $("#modelo-sim").onclick = () => trocarModelo(sugestaoModelo);
+  $("#modelo-nao").onclick = () => { sugestaoModelo = null; modeloRecusado = true; avisoModelo(); };
+}
+
+// ---------------- lado esquerdo do 7x5: display e faders ----------------
+function faderHTML(valor) {
+  const pct = valor == null ? 0 : valor * 100 / 127;
+  return `<div class="trilho-fader"><div class="cheio" style="height:${pct}%"></div>
+    <div class="pino" style="bottom:${pct}%"></div></div>
+    <div class="valor-fader">${valor == null ? "–" : Math.round(pct)}</div>`;
+}
+
+function desenharLado() {
+  const m = M();
+  $("#lado").hidden = !(m.faders.length || m.display);
+  if ($("#lado").hidden) return;
+  $("#faders").style.gridTemplateColumns = `repeat(${m.faders.length}, 1fr)`;
+  $("#faders").innerHTML = m.faders.map((cc, i) => {
+    const k = "cc:" + cc, a = cfg.controles[k] || {}, p = pintura(a);
+    return `<div class="ctrl fader ${p.cls} ${mudos[k] ? "mudo" : ""} ${selecionado === k ? "sel" : ""} ${a.tipo && a.tipo !== "nenhum" ? "" : "vazio"}" data-k="${k}" ${p.style}
+        title="${esc(resumo(a) || "sem função")}">
+      <span class="num">F${i + 1}</span>${iconeHTML(a)}
+      <div class="nome">${esc(a.nome || (resumo(a) || " "))}</div>
+      <div class="corpo-fader">${faderHTML(valores[k])}</div></div>`;
+  }).join("");
+  desenharDisplay();
+}
+
+// O OLED do aparelho mostra E1..E5 e P1..P4 (valor 0..127). A tela imita o que ele está mostrando.
+function desenharDisplay() {
+  const m = M(), el = $("#oled");
+  el.hidden = !m.display;
+  if (!m.display) return;
+  const v = cc => { const x = valores["cc:" + cc]; return x == null ? "  -" : String(x).padStart(3, " "); };
+  const linhas = [];
+  for (let i = 0; i < Math.max(m.encoders.length, m.faders.length); i++) {
+    const e = i < m.encoders.length ? `E${i + 1}:${v(m.encoders[i])}` : "      ";
+    const f = i < m.faders.length ? `P${i + 1}:${v(m.faders[i])}` : "";
+    linhas.push(`${e}   ${f}`);
+  }
+  el.textContent = " MIDI CONTROLLER\n\n" + linhas.join("\n");
 }
 
 function acender(k, ligar) {
@@ -468,20 +727,28 @@ function fecharEditor() {
 }
 
 function editor() {
-  const k = selecionado, ehEnc = k.startsWith("cc:");
-  const num = +k.split(":")[1];
-  const titulo = ehEnc ? `Encoder ${numEncoder(num)} <small style="color:var(--suave)">· CC ${num}</small>`
-                       : `Tecla ${teclasLivres().indexOf(num) + 1} <small style="color:var(--suave)">· nota ${num}</small>`;
+  const k = selecionado, num = +k.split(":")[1];
+  const fader = k.startsWith("cc:") && ehFader(num);
+  const ehEnc = k.startsWith("cc:") && !fader;
+  const pos = teclasLivres().indexOf(num);
+  const cinza = s => ` <small style="color:var(--suave)">· ${s}</small>`;
+  const titulo = fader ? `Fader ${M().faders.indexOf(num) + 1}` + cinza("CC " + num)
+    : ehEnc ? `Encoder ${numEncoder(num)}` + cinza("CC " + num)
+    : ehRedondo(num) ? `Botão redondo ${pos - M().grade + 1}` + cinza("nota " + num)
+    : `Tecla ${pos + 1}` + cinza("nota " + num);
+  const textoInverter = fader ? "Inverter o sentido (para cima = menos)"
+    : ehEnc ? "Girar ao contrário (inverter o sentido)"
+    : M().teclasInvertiveis ? "Teclas na ordem inversa (1 ↔ 16, vale para todas)" : "";
   const a = cfg.controles[k] || (cfg.controles[k] = {tipo: "nenhum"});
   const ed = $("#editor");
   ed.innerHTML = `<button class="fechar" title="Fechar (Esc)">✕</button><h2>Função</h2><h3 style="margin:0 0 14px;font-size:17px">${titulo}</h3>
     <div class="campo"><span>Nome (aparece na tecla)</span>
-      <input type="text" id="nome" placeholder="${ehEnc ? "Ex.: Spotify" : "Ex.: Copiar"}" value="${esc(a.nome || "")}"></div>
+      <input type="text" id="nome" placeholder="${ehEnc || fader ? "Ex.: Spotify" : "Ex.: Copiar"}" value="${esc(a.nome || "")}"></div>
     <div id="corpo"></div>
     <details class="sub" id="aparencia-box" ${a.cor || a.icone || a.icone_app ? "open" : ""}><summary style="cursor:pointer;font-weight:600;font-size:13px;margin-bottom:8px">🎨 Aparência na tela</summary>
       <div id="aparencia"></div></details>
-    <label class="chk" style="margin:4px 0 14px" title="Vale para todos os perfis: é um ajuste do aparelho">
-      <input type="checkbox" id="inverter"> ${ehEnc ? "Girar ao contrário (inverter o sentido)" : "Teclas na ordem inversa (1 ↔ 16, vale para todas)"}</label>
+    <label class="chk" style="margin:4px 0 14px" title="Vale para todos os perfis: é um ajuste do aparelho" ${textoInverter ? "" : "hidden"}>
+      <input type="checkbox" id="inverter"> ${textoInverter}</label>
     ${ehEnc ? `<div class="sub" id="botao-enc"><h3>⏺ Ao apertar o encoder</h3><div class="ligacao"></div><div class="acao-botao"></div></div>` : ""}
     <div class="acoes-editor" id="testes"></div>
     <div class="acoes-editor" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--borda)">
@@ -490,10 +757,12 @@ function editor() {
   ligarLimpar(k, ehEnc);
   const mudou = () => { salvarDepois(); desenharMantendo(); botoesTeste(); };
   $("#nome").oninput = e => { a.nome = e.target.value; salvarDepois(); desenharMantendo(); };
-  campoAcao($("#corpo"), a, ehEnc ? TIPOS_ENCODER : TIPOS_TECLA, mudou);
+  const tipos = fader ? TIPOS_FADER : ehEnc ? TIPOS_ENCODER
+    : ehRedondo(num) && M().redondosNoLado ? TIPOS_REDONDO : TIPOS_TECLA;
+  campoAcao($("#corpo"), a, tipos, mudou);
   editorAparencia(a, () => { salvarDepois(); desenharMantendo(); });
   if (ehEnc) editorBotao(a, mudou);
-  ligarInverter(ehEnc, num);
+  ligarInverter(ehEnc || fader, num);
   botoesTeste();
 }
 
@@ -570,11 +839,9 @@ function ligarBotao(encoder, numNota) {
 }
 
 // ---------------- calibração (girar e apertar cada knob, na ordem física) ----------------
-const LUGAR = ["de cima, à esquerda", "de cima, à direita", "de baixo, no meio", "de baixo, à direita"];
-
 async function iniciarCalib() {
   detectando = null;
-  calib = {passo: 0, fase: "girar", novo: [null, null, null, null], botoes: {}, ativoAntes: cfg.ativo !== false};
+  calib = {passo: 0, fase: "girar", novo: M().encoders.map(() => null), botoes: {}, ativoAntes: cfg.ativo !== false};
   if (calib.ativoAntes) await api("/api/config", {ativo: false});   // não disparar nada enquanto calibra
   $("#ativo").checked = false;
   avisoCalib(); desenhar();
@@ -583,10 +850,10 @@ async function iniciarCalib() {
 async function terminarCalib(salvar) {
   const c = calib; calib = null;
   if (salvar) {
-    const sobra = ENCODERS.filter(cc => !c.novo.includes(cc));
+    const sobra = M().encoders.filter(cc => !c.novo.includes(cc));
     cfg.layout = c.novo.map(cc => cc ?? sobra.shift());
     cfg.botoes = {};
-    for (const cc of ENCODERS) {
+    for (const cc of M().encoders) {
       if (c.botoes[cc] == null) continue;                 // pulado: esse knob não tem botão
       cfg.botoes["cc:" + cc] = c.botoes[cc];
       const a = cfg.controles["cc:" + cc] || (cfg.controles["cc:" + cc] = {tipo: "nenhum"});
@@ -605,7 +872,7 @@ async function terminarCalib(salvar) {
 
 function tratarCalib(ev) {
   const num = +ev.chave.split(":")[1];
-  if (calib.fase === "girar" && ev.tipo === "cc" && ENCODERS.includes(num) && !calib.novo.includes(num)) {
+  if (calib.fase === "girar" && ev.tipo === "cc" && M().encoders.includes(num) && !calib.novo.includes(num)) {
     calib.novo[calib.passo] = num;
     calib.fase = "apertar";
   } else if (calib.fase === "apertar" && ev.tipo === "note_on") {
@@ -618,18 +885,18 @@ function tratarCalib(ev) {
 
 function proximoPasso() {
   calib.passo++; calib.fase = "girar";
-  if (calib.passo >= 4) { terminarCalib(true); return; }
+  if (calib.passo >= M().encoders.length) { terminarCalib(true); return; }
   avisoCalib(); desenhar();
 }
 
 function avisoCalib() {
   const av = $("#aviso-calib");
   if (calib) {
-    const p = calib.passo;
+    const p = calib.passo, total = M().encoders.length;
     av.innerHTML = calib.fase === "girar"
-      ? `🎯 <b>Passo ${p + 1} de 4:</b> gire o encoder ${LUGAR[p]} (o que está piscando na tela).
+      ? `🎯 <b>Passo ${p + 1} de ${total}:</b> gire o encoder ${M().lugar[p]} (o que está piscando na tela).
          <button id="calib-cancelar">Cancelar</button>`
-      : `🎯 <b>Passo ${p + 1} de 4:</b> agora <b>aperte</b> esse mesmo encoder.
+      : `🎯 <b>Passo ${p + 1} de ${total}:</b> agora <b>aperte</b> esse mesmo encoder.
          <button id="calib-pular" title="Use se este knob não tiver botão">Não tem botão</button><button id="calib-cancelar">Cancelar</button>`;
     $("#calib-cancelar").onclick = () => terminarCalib(false);
     if ($("#calib-pular")) $("#calib-pular").onclick = () => { calib.botoes[calib.novo[calib.passo]] = null; proximoPasso(); };
@@ -681,7 +948,7 @@ function campoAcao(alvo, a, tipos, mudou) {
   const det = alvo.querySelector(".det");
   alvo.querySelector(".tipo").onchange = e => {
     a.tipo = e.target.value;
-    a.valor = a.tipo === "midia" ? "playpause" : "";
+    a.valor = a.tipo === "midia" ? "playpause" : a.tipo === "mudo_fader" ? faderDeCima(selecionado) : "";
     delete a.saida; delete a.microfone;
     if (a.tipo === "direcao") { a.esquerda = a.esquerda || {tipo: "midia", valor: "voldown"}; a.direita = a.direita || {tipo: "midia", valor: "volup"}; }
     detalhes(); mudou();
@@ -729,6 +996,15 @@ function campoAcao(alvo, a, tipos, mudou) {
           mudou();
         };
       }).catch(e => sel.innerHTML = `<option>Não consegui listar: ${esc(e.message)}</option>`);
+    } else if (t === "mudo_fader") {
+      const m = M();
+      det.innerHTML = `<div class="campo"><span>Qual fader</span><select style="width:100%">${
+        m.faders.map((cc, i) => `<option value="cc:${cc}" ${a.valor === "cc:" + cc ? "selected" : ""}>F${i + 1}${
+          resumo(cfg.controles["cc:" + cc] || {}) ? " — " + esc(resumo(cfg.controles["cc:" + cc])) : " (sem função)"}${
+          faderDeCima(selecionado) === "cc:" + cc ? " · o de cima" : ""}</option>`).join("")}</select>
+        <div class="dica">Liga e desliga o mudo do que esse fader controla (volume geral, de um programa ou do microfone).
+        Fica vermelho quando está mudo.</div></div>`;
+      det.querySelector("select").onchange = e => { a.valor = e.target.value; mudou(); };
     } else if (t === "perfil") {
       const nomes = Object.keys(cfg.perfis || {});
       det.innerHTML = `<div class="campo"><span>Ir para</span><select style="width:100%">
@@ -978,6 +1254,9 @@ async function iniciar() {
 
   cfg = e.config; midia = e.midia; valores = e.valores_cc; seq = e.seq; mudos = e.mudos || {};
   $("#ativo").checked = cfg.ativo !== false;
+  if (e.titulo) { document.title = e.titulo; $("header h1").textContent = "🎛️ " + e.titulo; }
+  preencherModelos();
+  $("#modelo").onchange = e => trocarModelo(e.target.value);
   $("#seguir").checked = !!cfg.selecionar_ao_apertar;    // desligado por padrão
   $("#barra-volume").checked = cfg.barra_volume !== false;
   preencherDispositivos(e.dispositivos, cfg.dispositivo || "");
@@ -1009,6 +1288,10 @@ async function ouvir() {
       seq = r.seq; status(r);
       mudos = r.mudos || {};
       document.querySelectorAll('.ctrl[data-k^="cc:"]').forEach(el => el.classList.toggle("mudo", !!mudos[el.dataset.k]));
+      document.querySelectorAll('.tecla.redondo').forEach(el => {     // botão que muta um fader acompanha o mudo dele
+        const a = cfg.controles[el.dataset.k] || {};
+        el.classList.toggle("mudo", a.tipo === "mudo_fader" && !!mudos[a.valor]);
+      });
       if (!calib && r.ativo !== cfg.ativo) { cfg.ativo = r.ativo; $("#ativo").checked = r.ativo; }   // mudou pela bandeja
       if (r.perfil_ativo !== cfg.perfil_ativo) {      // trocado por uma tecla do controlador
         await salvarJa();
@@ -1020,10 +1303,18 @@ async function ouvir() {
         if (ev.tipo === "cc") {
           valores[ev.chave] = ev.valor;
           const el = document.querySelector(`.ctrl[data-k="${ev.chave}"]`);
-          if (el) { el.querySelector(".knob").outerHTML = knobSVG(ev.valor); acender(ev.chave, true);
-                    clearTimeout(el._t); el._t = setTimeout(() => acender(ev.chave, false), 200); }
+          if (el) {
+            const corpo = el.querySelector(".corpo-fader");
+            if (corpo) corpo.innerHTML = faderHTML(ev.valor);
+            else el.querySelector(".knob").outerHTML = knobSVG(ev.valor);
+            acender(ev.chave, true);
+            clearTimeout(el._t); el._t = setTimeout(() => acender(ev.chave, false), 200);
+          }
+          desenharDisplay();
+          sugerirModelo(ev);
         } else {
           if (detectando && ev.tipo === "note_on") { ligarBotao(detectando, +ev.chave.split(":")[1]); continue; }
+          sugerirModelo(ev);
           acender(ev.dono || ev.chave, ev.tipo === "note_on");
         }
         const alvo = ev.dono || ev.chave;    // botão de encoder seleciona o encoder

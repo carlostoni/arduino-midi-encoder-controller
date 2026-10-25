@@ -106,6 +106,7 @@ Sem dependências pesadas: o MIDI, o teclado, o áudio, a bandeja e a barra de v
 - Cor e ícone de cada controle. O ícone pode ser um emoji ou o ícone do próprio programa.
 - Barra de volume flutuante no canto da tela ao girar um knob com o programa minimizado.
 - Fica na bandeja do Windows: fechar no X só esconde a janela.
+- Opção para iniciar junto com o Windows (já escondido na bandeja).
 - Calibração guiada: descobre a ordem dos knobs e qual sinal o botão de cada um manda.
 - Ajustes do aparelho: inverter o sentido de um knob e inverter a ordem das teclas.
 
@@ -147,6 +148,7 @@ Se o `pip` falhar por caminho longo no Windows, crie o ambiente virtual num cami
 | `bandeja.py` | Ícone na bandeja do Windows |
 | `osd.py` | Barra de volume flutuante (GDI+) |
 | `icones.py` | Ícone de um `.exe` em PNG, para usar no lugar do emoji |
+| `iniciar_windows.py` | Liga e desliga o início junto com o Windows (registro do usuário) |
 | `web/index.html` | A tela inteira (HTML, CSS e JS num arquivo só) |
 | `portatil.spec` | Receita do PyInstaller para o `.exe` |
 | `CLAUDE.md` | Notas técnicas detalhadas do projeto |

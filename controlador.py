@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, urlparse
 
 import acoes
 import icones
+import iniciar_windows
 from midi_win import EntradaMIDI, listar_dispositivos
 
 PORTA = 8800
@@ -28,6 +29,7 @@ PASTA_RECURSOS = getattr(sys, "_MEIPASS", PASTA)
 ARQ_CONFIG = os.path.join(PASTA, "config.json")
 ARQ_INDEX = os.path.join(PASTA_RECURSOS, "web", "index.html")
 ARQ_LOG = os.path.join(PASTA, "erro.log")
+TITULO = "Controlador MIDI"     # nome da janela, da bandeja e da entrada "iniciar com o Windows"
 
 PASTA_EXPORTADOS = os.path.join(PASTA, "Perfis exportados")
 FORMATO_EXPORT = "controlador-midi-perfis"
@@ -200,6 +202,8 @@ class Controlador:
 
     def salvar(self, cfg):
         cfg = dict(cfg)
+        if "inicia_com_windows" in cfg:      # fica no registro do Windows, não no config.json
+            iniciar_windows.definir(TITULO, bool(cfg.pop("inicia_com_windows")))
         with self.trava:
             # A tela diz de qual perfil são os controles: se o perfil foi trocado por uma
             # tecla no meio da edição, a gravação ainda vai para o perfil certo.
@@ -373,6 +377,7 @@ class Controlador:
                 "ultimo_erro": self.ultimo_erro,
                 "valores_cc": self.valores_cc,
                 "mudos": self.mudos,
+                "inicia_com_windows": iniciar_windows.ligado(TITULO),
                 "seq": self.seq,
                 "midia": acoes.MIDIA,
             }
@@ -541,6 +546,10 @@ def main():
             webbrowser.open(url)
         return
     CTRL = Controlador()
+    try:
+        iniciar_windows.corrigir_caminho(TITULO)     # a pasta pode ter mudado de lugar
+    except OSError as e:
+        _log_erro(f"iniciar com o Windows: {e!r}")
     try:
         import osd
         CTRL.osd = osd.Osd()

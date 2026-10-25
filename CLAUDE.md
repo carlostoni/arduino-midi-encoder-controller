@@ -56,6 +56,12 @@ Programa para Windows que dá funções às teclas e aos encoders de um controla
   - Na tela, as sugestões são o ícone em uso, o programa do próprio controle (volume de programa / abrir) e os que estão tocando som.
   - As sugestões repetidas viram uma só por `chaveApp`, que tira aspas, pasta e .exe/.lnk: `"C:\...\chrome.exe"` = `chrome`.
   - O × de cada sugestão a esconde em `config.sugestoes_ocultas` (global). Se ela estava em uso, também tira o ícone do controle. O botão "↺ Mostrar escondidos" limpa a lista.
+- **Iniciar com o Windows** (`iniciar_windows.py`, caixinha no topo da tela):
+  - Fica no registro, não no `config.json`: o valor `TITULO` em `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, com o comando `"<exe>" --minimizado` (rodando pelo Python, `pythonw.exe controlador.py --minimizado`).
+  - `ligado()` também confere `Explorer\StartupApproved\Run`: o 1º byte ímpar quer dizer que o usuário desligou em Configurações > Aplicativos > Inicialização. `definir(True)` apaga esse "desligado".
+  - O `main()` chama `corrigir_caminho()`, que reaponta a entrada se a pasta mudou de lugar.
+  - `/api/estado` devolve `inicia_com_windows`; `POST /api/config {inicia_com_windows}` liga ou desliga.
+  - Cada edição usa o próprio `TITULO` ("Controlador MIDI" / "Controlador MIDI 7x5"), então as duas entradas não se misturam.
 - Mudou só o `web/index.html`? No portátil basta copiar o arquivo para `_internal\web\` (não precisa regerar o .exe).
 - **Correções do aparelho** (globais, fora dos perfis), aplicadas no começo de `_ao_receber`, antes de tudo:
   - `invertidos`: lista de CC dos knobs que giram ao contrário (o valor vira 127 - valor). Caixinha "Girar ao contrário" no painel do encoder.

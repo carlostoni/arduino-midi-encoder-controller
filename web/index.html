@@ -177,7 +177,7 @@
     .aviso { margin-left: 12px; margin-right: 12px; }
   }
   @media (max-width: 520px) {
-    header .status #status-txt, .chk[title^="Ao apertar"], .chk[title^="Ao girar"] { display: none; }   /* sobra só a bolinha */
+    header .status #status-txt, .chk[title^="Ao apertar"], .chk[title^="Ao girar"], .chk[title^="Abre sozinho"] { display: none; }   /* sobra só a bolinha */
     .perfis .sep, #pf-exportar-todos { display: none; }
     .encoders { padding-bottom: 20px; }
     .encoders .baixo { transform: translateY(20px); }
@@ -271,6 +271,8 @@
     <input type="checkbox" id="seguir"> Selecionar ao apertar</label>
   <label class="chk" title="Ao girar ou apertar um encoder de volume com esta janela fora de foco, mostra uma barra no canto da tela">
     <input type="checkbox" id="barra-volume"> Barra de volume na tela</label>
+  <label class="chk" title="Abre sozinho, escondido na bandeja, quando você liga o computador">
+    <input type="checkbox" id="inicio-windows"> Iniciar com o Windows</label>
   <label class="chk" title="Desligue para mexer na configuração sem disparar as funções">
     <input type="checkbox" id="ativo"> Funções ligadas</label>
 </header>
@@ -1259,6 +1261,7 @@ async function iniciar() {
   $("#modelo").onchange = e => trocarModelo(e.target.value);
   $("#seguir").checked = !!cfg.selecionar_ao_apertar;    // desligado por padrão
   $("#barra-volume").checked = cfg.barra_volume !== false;
+  $("#inicio-windows").checked = !!e.inicia_com_windows;     // fica no registro do Windows, não no config
   preencherDispositivos(e.dispositivos, cfg.dispositivo || "");
   status(e); desenhar(); avisoCalib(); barraPerfis(); ligarBarraPerfis();
   $("#bt-calibrar").onclick = () => calib ? null : iniciarCalib();
@@ -1268,6 +1271,13 @@ async function iniciar() {
     if (selecionado && !ev.target.closest("#editor, .ctrl, header, .aviso") && document.contains(ev.target)) fecharEditor();
   });
   $("#ativo").onchange = ev => { cfg.ativo = ev.target.checked; api("/api/config", {ativo: ev.target.checked}); };
+  $("#inicio-windows").onchange = async ev => {
+    const ligar = ev.target.checked;
+    try {
+      await api("/api/config", {inicia_com_windows: ligar});
+      toast(ligar ? "Vai abrir sozinho quando o Windows iniciar ✓" : "Não abre mais com o Windows");
+    } catch (e) { ev.target.checked = !ligar; alert("Não consegui mudar: " + e.message); }
+  };
   $("#barra-volume").onchange = ev => {
     cfg.barra_volume = ev.target.checked; api("/api/config", {barra_volume: ev.target.checked});
   };

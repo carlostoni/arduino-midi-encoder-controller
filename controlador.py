@@ -29,7 +29,6 @@ PASTA_RECURSOS = getattr(sys, "_MEIPASS", PASTA)
 ARQ_CONFIG = os.path.join(PASTA, "config.json")
 ARQ_INDEX = os.path.join(PASTA_RECURSOS, "web", "index.html")
 ARQ_LOG = os.path.join(PASTA, "erro.log")
-TITULO = "Controlador MIDI"     # nome da janela, da bandeja e da entrada "iniciar com o Windows"
 
 
 def _ler_edicao():

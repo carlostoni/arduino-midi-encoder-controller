@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Controlador MIDI RGB em 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Bancada 3D: vista explodida do painel sobre a placa de montagem, controles ao lado. Mesma família visual das páginas de pinagem. */
+:root {
+  --bg:#eef2f1; --paper:#fbfcfc; --fg:#17221e; --muted:#5d6d67; --line:#cfd9d5; --pcb:#1f4b45; --pcb-fg:#d9efe9; --gold:#c9a24a;
+  --stage:#0f1715; --stage-fg:#d6e4df;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg:#0d1412; --paper:#121b18; --fg:#dbe5e1; --muted:#90a29b; --line:#2b3934; --pcb:#163a35; --pcb-fg:#cfe9e2; --gold:#d8b462;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg:#0d1412; --paper:#121b18; --fg:#dbe5e1; --muted:#90a29b; --line:#2b3934; --pcb:#163a35; --pcb-fg:#cfe9e2; --gold:#d8b462;
+  color-scheme: dark; }
+* { box-sizing:border-box }
+body { background:var(--bg); color:var(--fg); font-family:var(--f-body); font-size:15px; line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:22px 40px }
+.wrap { max-width:1360px; margin:0 auto; display:grid; gap:16px }
+header { display:grid; gap:6px }
+.eyebrow { font-family:var(--f-mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted) }
+h1 { font-family:var(--f-display); font-weight:600; font-size:clamp(26px,4vw,38px); line-height:1.05; margin:0; text-wrap:balance }
+h2 { font-family:var(--f-display); font-weight:600; font-size:17px; margin:0 }
+p { margin:0; max-width:72ch }
+.lead { color:var(--muted) }
+.layout { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:16px; align-items:start }
+@media (max-width:920px) { .layout { grid-template-columns:minmax(0,1fr) } }
+.stage { position:relative; height:min(74vh, 760px); min-height:420px; border-radius:10px; overflow:hidden; background:var(--stage); border:1px solid var(--line) }
+@media (max-width:640px) { .stage { height:62vh; min-height:360px } }
+.stage canvas { display:block; width:100%; height:100%; touch-action:none; cursor:grab }
+.stage canvas:active { cursor:grabbing }
+.hud { position:absolute; left:12px; bottom:12px; right:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; pointer-events:none }
+.hud > * { pointer-events:auto }
+.hbtn { font-family:var(--f-mono); font-size:12px; padding:6px 10px; border-radius:6px; border:1px solid #33443f; background:#16211ecc; color:var(--stage-fg); cursor:pointer }
+.hbtn:hover { border-color:#5a6f68 }
+.hint { font-family:var(--f-mono); font-size:11.5px; color:#8fa59d; margin-left:auto }
+.status { position:absolute; inset:0; display:grid; place-items:center; color:var(--stage-fg); font-family:var(--f-mono); font-size:13px; text-align:center; padding:20px }
+#card { position:absolute; top:12px; left:12px; max-width:min(340px, calc(100% - 24px)); background:#121c19ee; color:var(--stage-fg); border:1px solid #33443f;
+  border-radius:8px; padding:12px 14px; display:grid; gap:6px }
+#card h3 { margin:0; font-family:var(--f-display); font-size:17px; font-weight:600 }
+#card .k { font-family:var(--f-mono); font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:#8fa59d }
+#card p { font-size:13.5px; color:#c3d3cd }
+#card ul { margin:0; padding-left:16px; font-size:13px; color:#c3d3cd; display:grid; gap:2px }
+#card button { justify-self:start; font-family:var(--f-mono); font-size:11.5px; padding:3px 8px; border-radius:5px; border:1px solid #33443f; background:transparent; color:var(--stage-fg); cursor:pointer }
+
+aside.side { display:grid; gap:18px; background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:16px }
+.ctl { display:grid; gap:8px }
+.ctl h2 { display:flex; justify-content:space-between; align-items:baseline }
+.ctl h2 small { font-family:var(--f-mono); font-size:11.5px; font-weight:400; color:var(--muted) }
+input[type=range] { width:100%; accent-color:var(--pcb) }
+.chk { display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer }
+.chk input { width:16px; height:16px; accent-color:var(--pcb); margin:0 }
+.sw { width:22px; height:6px; border-radius:3px; flex:none }
+.encs { display:grid; gap:6px }
+.encs label { display:grid; grid-template-columns:28px minmax(0,1fr) 30px 14px; align-items:center; gap:8px; font-family:var(--f-mono); font-size:12px }
+.encs output { text-align:right; font-variant-numeric:tabular-nums }
+.dot { width:14px; height:14px; border-radius:50% }
+.note { font-size:13px; color:var(--muted) }
+button:focus-visible, input:focus-visible { outline:2px solid var(--gold); outline-offset:2px }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Montado na Tampa.step · 221,7 × 154,7 × 13 mm · aço 2 mm · vista explodida</div>
+  <h1>Controlador MIDI RGB em 3D</h1>
+  <p class="lead">A tampa está em escala real, com os rasgos, furos e quadrados nas coordenadas do arquivo. Arraste para girar, use a roda ou dois dedos para aproximar e clique numa peça para ver o que liga nela.</p>
+</header>
+
+<div class="layout">
+  <div class="stage" id="stage">
+    <div class="status" id="status">Carregando o modelo 3D…</div>
+    <div id="card" hidden>
+      <span class="k" id="c-k"></span>
+      <h3 id="c-t"></h3>
+      <p id="c-p"></p>
+      <ul id="c-l"></ul>
+      <button type="button" id="c-x">Mostrar tudo</button>
+    </div>
+    <div class="hud">
+      <button type="button" class="hbtn" id="v-iso">Vista 3D</button>
+      <button type="button" class="hbtn" id="v-top">De cima</button>
+      <button type="button" class="hbtn" id="v-side">De lado</button>
+      <span class="hint">tampa em escala real · componentes aproximados</span>
+    </div>
+  </div>
+
+  <aside class="side" aria-label="Controles da vista">
+    <div class="ctl">
+      <h2>Separar camadas <small id="ex-o">60%</small></h2>
+      <input type="range" id="explode" min="0" max="100" value="60" aria-label="Separação entre o painel e a placa">
+      <label class="chk" for="glass"><input type="checkbox" id="glass" checked> Painel transparente</label>
+      <label class="chk" for="labels"><input type="checkbox" id="labels" checked> Nomes das placas</label>
+    </div>
+    <div class="ctl">
+      <h2>Fios</h2>
+      <div id="wires"></div>
+    </div>
+    <div class="ctl">
+      <h2>Encoders <small>volume e cor do LED</small></h2>
+      <div class="encs" id="encs"></div>
+      <p class="note">Volume 0 acende vermelho e 127 acende azul, igual ao código.</p>
+    </div>
+  </aside>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+const $ = id => document.getElementById(id);
+if (!window.THREE || !THREE.OrbitControls) { $('status').textContent = 'Não foi possível carregar o 3D. Recarregue a página.'; return; }
+
+// ------------------------------------------------------------ cena
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+stage.insertBefore(renderer.domElement, stage.firstChild);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0f1715);
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 400);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08; controls.maxPolarAngle = Math.PI * 0.95;
+controls.minDistance = 6; controls.maxDistance = 120;
+
+scene.add(new THREE.HemisphereLight(0xdfeee9, 0x1b2320, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.85); sun.position.set(14, 30, 18); scene.add(sun);
+const fill = new THREE.DirectionalLight(0x9fc4ff, 0.35); fill.position.set(-20, 6, -14); scene.add(fill);
+
+const grid = new THREE.GridHelper(60, 30, 0x24332f, 0x1a2522); grid.position.y = -0.6; scene.add(grid);
+
+function mat(color, o) { return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.6, metalness: 0.1 }, o || {})); }
+function box(w, h, d, m) { return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); }
+function cyl(r, h, m, seg) { return new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg || 24), m); }
+
+const M = {
+  panel: mat(0xa7b0b5, { metalness: 0.75, roughness: 0.38, transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide }),
+  perf: mat(0x9a7b3c, { roughness: 0.8 }), perfHole: mat(0x6e5628),
+  pcbBlue: mat(0x1f4fa0), pcbBlack: mat(0x1b1f22), chip: mat(0x111314, { roughness: 0.35 }),
+  metal: mat(0xc9cdd0, { metalness: 0.9, roughness: 0.3 }), gold: mat(0xd2a64a, { metalness: 0.8, roughness: 0.35 }),
+  socket: mat(0x2a2a2a), slot: mat(0x0a0d0c), fader: mat(0x3a4450, { metalness: 0.4 }), cap: mat(0xd9dde0, { roughness: 0.4 }),
+  pad: mat(0x3d4a46, { roughness: 0.9 }), padTop: mat(0x55665f, { roughness: 0.9 }), btn: mat(0x1d2422),
+  resistor: mat(0xd8c49a), diode: mat(0xd36a3a, { transparent: true, opacity: 0.9 }), body: mat(0x2c2f33, { metalness: 0.5 }),
+  screen: null, knob: mat(0xe8f2ff, { transparent: true, opacity: 0.55, roughness: 0.15 }), shaft: mat(0x9aa3a8, { metalness: 0.8 }),
+  railV: mat(0xc7372a), railG: mat(0x5c6b66), capBlue: mat(0x2a6fd6)
+};
+
+// ------------------------------------------------------------ grupos
+const PT = 0.2;                       // chapa de 2 mm
+const panel = new THREE.Group(); scene.add(panel);
+const base = new THREE.Group(); scene.add(base);
+const pickables = [];
+function pick(mesh, key) { mesh.userData.key = key; pickables.push(mesh); return mesh; }
+
+// ---- tampa do arquivo Tampa.step (mm do arquivo -> cm da cena, centro da tampa na origem)
+const sx = X => (X - 119.92) / 10, sy = Y => (Y - 97.35) / 10, sz = Y => -sy(Y);
+function rrPath(path, x, y, w, h, r) {
+  const x0 = x - w / 2, y0 = y - h / 2, x1 = x + w / 2, y1 = y + h / 2;
+  if (!r) { path.moveTo(x0, y0); path.lineTo(x1, y0); path.lineTo(x1, y1); path.lineTo(x0, y1); path.lineTo(x0, y0); return path; }
+  path.moveTo(x0 + r, y0); path.lineTo(x1 - r, y0); path.absarc(x1 - r, y0 + r, r, -Math.PI / 2, 0, false);
+  path.lineTo(x1, y1 - r); path.absarc(x1 - r, y1 - r, r, 0, Math.PI / 2, false);
+  path.lineTo(x0 + r, y1); path.absarc(x0 + r, y1 - r, r, Math.PI / 2, Math.PI, false);
+  path.lineTo(x0, y0 + r); path.absarc(x0 + r, y0 + r, r, Math.PI, Math.PI * 1.5, false);
+  return path;
+}
+function circ(x, y, r) { const p = new THREE.Path(); p.moveTo(x + r, y); p.absarc(x, y, r, 0, Math.PI * 2, false); return p; }
+const TAMPA = {
+  faderX: [31.35, 51.35, 71.35, 91.35],
+  colX: [0, 1, 2, 3, 4].map(c => 117.7 + 22 * c),
+  rowY: [0, 1, 2, 3, 4].map(r => 133 - 22 * r)      // fileira 1 (de cima) .. 5
+};
+{
+  const top = rrPath(new THREE.Shape(), 0, 0, 22.17, 15.47, 1.5);
+  TAMPA.faderX.forEach(X => { top.holes.push(rrPath(new THREE.Path(), sx(X), sy(100), 0.4, 7.2, 0.2)); top.holes.push(circ(sx(X), sy(45), 0.335)); });
+  TAMPA.colX.forEach(X => { top.holes.push(circ(sx(X), sy(155.85), 0.35)); TAMPA.rowY.forEach(Y => top.holes.push(rrPath(new THREE.Path(), sx(X), sy(Y), 1.4, 1.4, 0))); });
+  const g1 = new THREE.ExtrudeGeometry(top, { depth: 0.2, bevelEnabled: false, curveSegments: 20 });
+  g1.rotateX(-Math.PI / 2); g1.translate(0, -0.2, 0);
+  const plate = pick(new THREE.Mesh(g1, M.panel), 'LID'); panel.add(plate);
+  const skirtS = rrPath(new THREE.Shape(), 0, 0, 22.17, 15.47, 1.5); skirtS.holes.push(rrPath(new THREE.Path(), 0, 0, 21.77, 15.07, 1.3));
+  const g2 = new THREE.ExtrudeGeometry(skirtS, { depth: 1.1, bevelEnabled: false, curveSegments: 20 });
+  g2.rotateX(-Math.PI / 2); g2.translate(0, -1.3, 0);
+  const skirt = pick(new THREE.Mesh(g2, M.panel), 'LID'); panel.add(skirt);
+  const em = new THREE.LineBasicMaterial({ color: 0x7d8f8a });
+  panel.add(new THREE.LineSegments(new THREE.EdgesGeometry(g1, 25), em));
+  panel.add(new THREE.LineSegments(new THREE.EdgesGeometry(g2, 25), em));
+}
+
+// ------------------------------------------------------------ OLED
+const oledCanvas = document.createElement('canvas'); oledCanvas.width = 256; oledCanvas.height = 128;
+const oledTex = new THREE.CanvasTexture(oledCanvas);
+M.screen = new THREE.MeshBasicMaterial({ map: oledTex });
+const OLED = { x: sx(61.35), z: sz(157) };
+{
+  const g = new THREE.Group(); g.position.set(OLED.x, 0, OLED.z); panel.add(g);
+  const bezel = pick(box(3.0, 0.12, 2.0, M.pcbBlack), 'OLED'); bezel.position.y = 0.06; g.add(bezel);
+  const scr = pick(new THREE.Mesh(new THREE.PlaneGeometry(2.56, 1.36), M.screen), 'OLED');
+  scr.rotation.x = -Math.PI / 2; scr.position.y = 0.125; g.add(scr);
+  const pcb = pick(box(2.7, 0.16, 2.8, M.pcbBlue), 'OLED'); pcb.position.set(0, -PT - 0.25, 0.2); g.add(pcb);
+  for (let i = 0; i < 4; i++) { const p = cyl(0.05, 0.5, M.gold, 8); p.position.set(-0.38 + i * 0.254, -PT - 0.55, -1.0); g.add(p); }
+}
+{
+  const pts = [[-1.3, -0.75], [1.3, -0.75], [1.3, 0.75], [-1.3, 0.75], [-1.3, -0.75]].map(([a, b]) => new THREE.Vector3(OLED.x + a, 0.02, OLED.z + b));
+  const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: 0xffcc55, dashSize: 0.18, gapSize: 0.12 }));
+  ln.computeLineDistances(); panel.add(ln);
+}
+const oledPin = i => ({ obj: panel, p: new THREE.Vector3(OLED.x - 0.38 + i * 0.254, -PT - 0.8, OLED.z - 1.0) });
+
+// ------------------------------------------------------------ faders
+const FX = TAMPA.faderX.map(sx), FZ = sz(100), faderPos = [0.7, 0.45, 0.25, 0.85];
+const faderPins = [];
+FX.forEach((x, k) => {
+  const g = new THREE.Group(); g.position.set(x, 0, FZ); panel.add(g);
+    const capm = pick(box(1.1, 0.9, 0.7, M.cap), 'FAD' + (k + 1)); capm.position.set(0, 0.45, 3.0 - 6.0 * faderPos[k]); g.add(capm);
+  const lever = box(0.12, 0.5, 0.12, M.metal); lever.position.set(0, 0.05, 3.0 - 6.0 * faderPos[k]); g.add(lever);
+  const bodym = pick(box(0.95, 1.0, 7.6, M.fader), 'FAD' + (k + 1)); bodym.position.set(0, -PT - 0.5, 0); g.add(bodym);
+  for (let j = 0; j < 3; j++) { const p = cyl(0.05, 0.5, M.gold, 8); p.position.set(-0.3 + j * 0.3, -PT - 1.25, 3.5); g.add(p); }
+  faderPins.push(j => ({ obj: panel, p: new THREE.Vector3(x - 0.3 + j * 0.3, -PT - 1.5, FZ + 3.5) }));
+});
+
+// ------------------------------------------------------------ encoders, pads, botões
+const CX = TAMPA.colX.map(sx);
+const EZ = sz(155.85), PAD_Z = TAMPA.rowY.map(sz);
+const encVal = [0, 32, 64, 96, 127];
+const encKnob = [], encRing = [], encLight = [];
+function hueRGB(v) {                       // mesmo cálculo do código: 0 vermelho .. 127 azul
+  const hue = Math.floor(v * 240 / 127), s = Math.floor(hue / 60), up = (hue % 60) / 60, dn = 1 - up;
+  return [[1, up, 0], [dn, 1, 0], [0, 1, up], [0, dn, 1], [up, 0, 1], [1, 0, dn]][s];
+}
+const encPin = (k, name) => {
+  const back = { A: -0.4, C: 0, B: 0.4 }, front = { R: -0.5, G: -0.25, SW: 0, LB: 0.25, '+': 0.5 };
+  if (name in back) return { obj: panel, p: new THREE.Vector3(CX[k] + back[name], -PT - 1.15, EZ - 0.75) };
+  return { obj: panel, p: new THREE.Vector3(CX[k] + front[name], -PT - 1.15, EZ + 0.75) };
+};
+CX.forEach((x, k) => {
+  const key = 'ENC' + (k + 1);
+  const g = new THREE.Group(); g.position.set(x, 0, EZ); panel.add(g);
+  const ringMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.2, roughness: 0.3 });
+  const ring = pick(new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.09, 10, 40), ringMat), key);
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.08; ring.userData.noHi = true; g.add(ring); encRing.push(ring);
+  const knobG = new THREE.Group(); knobG.position.y = 0.1; g.add(knobG); encKnob.push(knobG);
+  const knob = pick(cyl(0.68, 1.3, M.knob, 32), key); knob.position.y = 0.65; knobG.add(knob);
+  const mark = box(0.1, 0.05, 0.42, mat(0x20262a)); mark.position.set(0, 1.32, -0.42); knobG.add(mark);
+  const shaft = cyl(0.3, 1.1, M.shaft, 16); shaft.position.y = 0.45; g.add(shaft);
+  const light = new THREE.PointLight(0xffffff, 0.6, 3.2); light.position.y = 0.6; g.add(light); encLight.push(light);
+  const bodym = pick(box(1.25, 0.7, 1.25, M.body), key); bodym.position.y = -PT - 0.35; g.add(bodym);
+  for (const dx of [-0.4, 0, 0.4]) { const p = cyl(0.05, 0.5, M.gold, 8); p.position.set(dx, -PT - 0.9, -0.75); g.add(p); }
+  for (const dx of [-0.5, -0.25, 0, 0.25, 0.5]) { const p = cyl(0.05, 0.5, M.gold, 8); p.position.set(dx, -PT - 0.9, 0.75); g.add(p); }
+});
+
+// matriz: 25 chaves nos quadrados 14 x 14. A tampa não tem furos para os 5 botões de baixo (linha 6).
+const ROW_Z = PAD_Z.slice();
+const rowY = -PT - 0.85, colY = -PT - 0.6;
+ROW_Z.forEach((z, r) => CX.forEach((x, c) => {
+  const n = r * 5 + c + 6, key = 'BTN' + n;
+  const hous = pick(box(1.42, 0.6, 1.42, M.btn), key); hous.position.set(x, 0.3, z); panel.add(hous);
+  const cap = pick(box(1.8, 0.7, 1.8, M.pad), key); cap.position.set(x, 0.95, z); panel.add(cap);
+  const t = box(1.45, 0.02, 1.45, M.padTop); t.position.set(x, 1.31, z); panel.add(t);
+  const sw = pick(box(1.38, 0.5, 1.38, M.btn), key); sw.position.set(x, -PT - 0.25, z); panel.add(sw);
+  const d = pick(cyl(0.07, 0.38, M.diode, 10), key); d.rotation.x = Math.PI / 2; d.position.set(x + 0.5, rowY + 0.05, z + 0.6); panel.add(d);
+}));
+const rowEnd = r => ({ obj: panel, p: new THREE.Vector3(CX[0] - 1.6, rowY, ROW_Z[r] + 0.9) });
+const colEnd = c => ({ obj: panel, p: new THREE.Vector3(CX[c] - 0.9, colY, PAD_Z[0] - 1.3) });
+
+// ------------------------------------------------------------ placa de montagem
+const perf = pick(box(20.5, 0.16, 13, M.perf), 'PERF'); perf.position.y = 0; base.add(perf);
+{
+  const holes = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.04, 0.04, 0.02, 6), M.perfHole, 41 * 26);
+  const m4 = new THREE.Matrix4(); let i = 0;
+  for (let a = 0; a < 41; a++) for (let b = 0; b < 26; b++) { m4.makeTranslation(-10 + a * 0.5, 0.09, -6.25 + b * 0.5); holes.setMatrixAt(i++, m4); }
+  base.add(holes);
+}
+// trilhas de alimentação
+const railV = pick(box(20, 0.08, 0.18, M.railV), 'RAIL'); railV.position.set(0, 0.12, -5.6); base.add(railV);
+const railG = pick(box(20, 0.08, 0.18, M.railG), 'RAIL'); railG.position.set(0, 0.12, -6.1); base.add(railG);
+const vcc = x => ({ obj: base, p: new THREE.Vector3(Math.max(-9.8, Math.min(9.8, x)), 0.18, -5.6) });
+const gnd = x => ({ obj: base, p: new THREE.Vector3(Math.max(-9.8, Math.min(9.8, x)), 0.18, -6.1) });
+
+// Pro Micro
+const PM = { x: -6.5, z: 0.2, y: 0.55 };
+{
+  const g = new THREE.Group(); g.position.set(PM.x, PM.y, PM.z); base.add(g);
+  const pcb = pick(box(3.3, 0.16, 1.8, M.pcbBlack), 'PM'); g.add(pcb);
+  const chip = pick(box(0.9, 0.12, 0.9, M.chip), 'PM'); chip.position.set(0.2, 0.14, 0); g.add(chip);
+  const usb = pick(box(0.6, 0.3, 0.8, M.metal), 'PM'); usb.position.set(-1.55, 0.2, 0); g.add(usb);
+  for (let i = 0; i < 12; i++) for (const z of [-0.76, 0.76]) {
+    const p = cyl(0.045, 0.6, M.gold, 8); p.position.set(-1.4 + i * 0.254, -0.3, z); g.add(p);
+  }
+}
+const PM_L = ['LIN1', 'SW5', 'GND', 'GND', 'SDA', 'SCL', 'LIN2', 'LIN3', 'LIN4', 'LIN5', 'LIN6', 'COL1'];
+const PM_R = ['RAW', 'GND', 'RST', 'VCC', 'FD4', 'FD3', 'FD2', 'FD1', 'COL4', 'COL3', 'COL5', 'COL2'];
+function pmPin(net) {
+  let i = PM_L.indexOf(net), z = -0.76;
+  if (i < 0) { i = PM_R.indexOf(net); z = 0.76; }
+  return { obj: base, p: new THREE.Vector3(PM.x - 1.4 + i * 0.254, PM.y + 0.1, PM.z + z) };
+}
+
+// MCP23017
+const MC = { x: 0.2, z: -2.6, y: 0.42 };
+{
+  const g = new THREE.Group(); g.position.set(MC.x, MC.y, MC.z); base.add(g);
+  const sock = pick(box(3.9, 0.35, 1.1, M.socket), 'MCP'); sock.position.y = -0.15; g.add(sock);
+  const ic = pick(box(3.6, 0.35, 0.72, M.chip), 'MCP'); ic.position.y = 0.2; g.add(ic);
+  const notch = cyl(0.1, 0.02, M.socket, 12); notch.position.set(-1.7, 0.38, 0); g.add(notch);
+}
+function mcpPin(n) {          // 1..14 na fileira da frente (z+), 15..28 atrás (z-)
+  const front = n <= 14, i = front ? n - 1 : 28 - n;
+  return { obj: base, p: new THREE.Vector3(MC.x - 1.65 + i * 0.254, MC.y + 0.4, MC.z + (front ? 0.38 : -0.38)) };
+}
+const capm = pick(cyl(0.18, 0.3, M.capBlue, 14), 'CAP'); capm.position.set(MC.x + 0.9, 0.3, MC.z + 0.95); base.add(capm);
+
+// PCA9685
+const PC = { x: 5.4, z: 1.6, y: 0.5 };
+{
+  const g = new THREE.Group(); g.position.set(PC.x, PC.y, PC.z); base.add(g);
+  const pcb = pick(box(6.2, 0.16, 2.5, M.pcbBlue), 'PCA'); g.add(pcb);
+  const ic = pick(box(0.9, 0.12, 0.9, M.chip), 'PCA'); ic.position.set(0, 0.14, -0.3); g.add(ic);
+  for (let i = 0; i < 6; i++) { const p = cyl(0.045, 0.6, M.gold, 8); p.position.set(-2.95, 0.3, -0.64 + i * 0.254); g.add(p); }
+  const hdrCols = [0xffcf3a, 0xd23b2f, 0x1b1b1b];
+  for (let c = 0; c < 16; c++) for (let j = 0; j < 3; j++) {
+    const p = box(0.12, 0.6, 0.12, mat(hdrCols[j])); p.position.set(-2.4 + c * 0.32, 0.3, 0.55 + j * 0.25); g.add(p);
+  }
+}
+const PCA_HDR = ['GND', 'OE', 'SCL', 'SDA', 'VCC', 'V+'];
+const pcaHdr = name => ({ obj: base, p: new THREE.Vector3(PC.x - 2.95, PC.y + 0.6, PC.z - 0.64 + PCA_HDR.indexOf(name) * 0.254) });
+const pcaCh = c => ({ obj: base, p: new THREE.Vector3(PC.x - 2.4 + c * 0.32, PC.y + 0.62, PC.z + 0.55) });
+// resistores dos LEDs (15) e pull-downs (5)
+const ledRes = [];
+for (let c = 0; c < 15; c++) {
+  const x = PC.x - 2.4 + c * 0.32, z = PC.z + 2.4;
+  const r = pick(cyl(0.08, 0.6, M.resistor, 10), 'RES'); r.rotation.x = Math.PI / 2; r.position.set(x, 0.25, z); base.add(r);
+  ledRes.push({ a: { obj: base, p: new THREE.Vector3(x, 0.3, z - 0.32) }, b: { obj: base, p: new THREE.Vector3(x, 0.3, z + 0.32) } });
+}
+const pdRes = [];
+for (let k = 0; k < 5; k++) {
+  const x = MC.x - 1.6 + k * 0.8, z = MC.z - 1.6;
+  const r = pick(cyl(0.08, 0.6, M.resistor, 10), 'PD'); r.rotation.x = Math.PI / 2; r.position.set(x, 0.25, z); base.add(r);
+  pdRes.push({ a: { obj: base, p: new THREE.Vector3(x, 0.3, z + 0.32) }, b: { obj: base, p: new THREE.Vector3(x, 0.3, z - 0.32) } });
+}
+
+// nomes das placas
+const labelSprites = [];
+function label(text, x, y, z, parent) {
+  const c = document.createElement('canvas'), ctx = c.getContext('2d');
+  ctx.font = '600 44px "IBM Plex Mono", monospace';
+  const w = Math.ceil(ctx.measureText(text).width) + 36; c.width = w; c.height = 72;
+  ctx.font = '600 44px "IBM Plex Mono", monospace';
+  ctx.fillStyle = 'rgba(14,22,20,0.82)'; ctx.fillRect(0, 0, w, 72);
+  ctx.strokeStyle = '#4f6660'; ctx.lineWidth = 3; ctx.strokeRect(1.5, 1.5, w - 3, 69);
+  ctx.fillStyle = '#e7f2ee'; ctx.textBaseline = 'middle'; ctx.fillText(text, 18, 38);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
+  s.scale.set(w / 72 * 0.6, 0.6, 1); s.position.set(x, y, z); s.renderOrder = 10;
+  (parent || base).add(s); labelSprites.push(s);
+}
+label('Pro Micro', PM.x, 2.2, PM.z);
+label('MCP23017', MC.x, 2.0, MC.z);
+label('PCA9685', PC.x, 2.2, PC.z);
+label('5V / GND', -7.5, 1.4, -5.85);
+label('OLED · janela sugerida', OLED.x, 1.6, OLED.z, panel);
+label('4 furos Ø6,7 · sem uso', sx(61.35), 1.0, sz(45) + 0.9, panel);
+label('Tampa.step', sx(100), 0.5, sz(14), panel);
+
+// ------------------------------------------------------------ fios
+const GROUPS = {
+  i2c:   { name: 'I²C (SDA, SCL)', color: 0xa58bff },
+  power: { name: 'Alimentação (5V, GND)', color: 0xff5d4a },
+  enc:   { name: 'Giro dos encoders (A, B)', color: 0xf06aa8 },
+  sw:    { name: 'Botões dos encoders (SW)', color: 0x39c6e0 },
+  led:   { name: 'LEDs RGB (R, G, B)', color: 0xffd54a },
+  fad:   { name: 'Faders (cursor)', color: 0x6fa8ff },
+  mat:   { name: 'Matriz (linhas e colunas)', color: 0x3fd3a6 }
+};
+const wires = [];
+function wire(a, b, group, comps, color, opt) {
+  const m = new THREE.MeshStandardMaterial({ color: color || GROUPS[group].color, roughness: 0.5, transparent: true, opacity: 1 });
+  const mesh = new THREE.Mesh(new THREE.BufferGeometry(), m);
+  mesh.userData = { a, b, group, comps, opt: opt || {} };
+  scene.add(mesh); wires.push(mesh); return mesh;
+}
+const W = new THREE.Vector3();
+function wp(end) { end.obj.updateMatrixWorld(); return end.p.clone().applyMatrix4(end.obj.matrixWorld); }
+function rebuildWires() {
+  for (const w of wires) {
+    const a = wp(w.userData.a), b = wp(w.userData.b), o = w.userData.opt;
+    let c1, c2;
+    if (o.flat) {               // fio rente (trilha curta na placa ou no painel)
+      const lift = o.lift || 0.4;
+      c1 = a.clone().add(new THREE.Vector3(0, lift, 0)); c2 = b.clone().add(new THREE.Vector3(0, lift, 0));
+    } else {
+      const dy = Math.abs(a.y - b.y), d = 0.35 * dy + 1.2;
+      c1 = a.clone().add(new THREE.Vector3(0, a.y > b.y ? -d : d, 0));
+      c2 = b.clone().add(new THREE.Vector3(0, a.y > b.y ? d : -d, 0));
+    }
+    const curve = new THREE.CubicBezierCurve3(a, c1, c2, b);
+    w.geometry.dispose();
+    w.geometry = new THREE.TubeGeometry(curve, o.flat ? 10 : 28, o.r || 0.045, 6, false);
+  }
+}
+
+// I²C
+for (const n of ['SDA', 'SCL']) {
+  wire(pmPin(n), mcpPin(n === 'SDA' ? 13 : 12), 'i2c', ['PM', 'MCP']);
+  wire(pmPin(n), pcaHdr(n), 'i2c', ['PM', 'PCA']);
+  wire(pmPin(n), oledPin(n === 'SDA' ? 3 : 2), 'i2c', ['PM', 'OLED']);
+}
+// alimentação
+const VCOL = 0xff5d4a, GCOL = 0x8fa39c;
+wire(pmPin('VCC'), vcc(PM.x + 0.6), 'power', ['PM', 'RAIL'], VCOL, { flat: true, lift: 0.8 });
+wire(pmPin('GND'), gnd(PM.x - 0.6), 'power', ['PM', 'RAIL'], GCOL, { flat: true, lift: 0.8 });
+wire(mcpPin(9), vcc(MC.x - 0.6), 'power', ['MCP', 'RAIL'], VCOL, { flat: true });
+wire(mcpPin(18), vcc(MC.x + 1.2), 'power', ['MCP', 'RAIL'], VCOL, { flat: true });
+wire(mcpPin(10), gnd(MC.x - 0.2), 'power', ['MCP', 'RAIL'], GCOL, { flat: true, lift: 0.7 });
+for (const n of [15, 16, 17]) wire(mcpPin(n), gnd(MC.x + 1.6 + (n - 15) * 0.3), 'power', ['MCP', 'RAIL'], GCOL, { flat: true });
+wire(pcaHdr('VCC'), vcc(PC.x - 2.0), 'power', ['PCA', 'RAIL'], VCOL, { flat: true, lift: 0.7 });
+wire(pcaHdr('GND'), gnd(PC.x - 1.6), 'power', ['PCA', 'RAIL'], GCOL, { flat: true, lift: 0.9 });
+wire(oledPin(1), vcc(OLED.x), 'power', ['OLED', 'RAIL'], VCOL);
+wire(oledPin(0), gnd(OLED.x - 0.4), 'power', ['OLED', 'RAIL'], GCOL);
+FX.forEach((x, k) => {
+  wire(faderPins[k](0), vcc(x), 'power', ['FAD' + (k + 1), 'RAIL'], VCOL);
+  wire(faderPins[k](2), gnd(x + 0.4), 'power', ['FAD' + (k + 1), 'RAIL'], GCOL);
+  wire(faderPins[k](1), pmPin('FD' + (k + 1)), 'fad', ['FAD' + (k + 1), 'PM']);
+});
+// encoders
+const SW_DEST = [mcpPin(26), mcpPin(27), mcpPin(6), mcpPin(7), pmPin('SW5')];
+const LEDC = { R: 0xff4d4d, G: 0x3ddc84, LB: 0x4d8dff };
+CX.forEach((x, k) => {
+  const key = 'ENC' + (k + 1);
+  wire(encPin(k, 'A'), mcpPin(21 + k), 'enc', [key, 'MCP']);
+  wire(encPin(k, 'B'), mcpPin(1 + k), 'enc', [key, 'MCP']);
+  wire(encPin(k, 'C'), gnd(x - 0.5), 'power', [key, 'RAIL'], GCOL);
+  wire(encPin(k, '+'), vcc(x + 0.5), 'power', [key, 'RAIL'], VCOL);
+  wire(encPin(k, 'SW'), SW_DEST[k], 'sw', [key, k < 4 ? 'MCP' : 'PM', 'PD']);
+  wire(SW_DEST[k], pdRes[k].a, 'sw', [key, 'PD', k < 4 ? 'MCP' : 'PM'], null, { flat: true, lift: 0.5 });
+  wire(pdRes[k].b, gnd(MC.x - 1.6 + k * 0.8), 'power', ['PD', 'RAIL', key], GCOL, { flat: true, lift: 0.3 });
+  ['R', 'G', 'LB'].forEach((c, j) => {
+    const ch = 3 * k + j;
+    wire(pcaCh(ch), ledRes[ch].a, 'led', [key, 'PCA', 'RES'], LEDC[c], { flat: true, lift: 0.3, r: 0.035 });
+    wire(encPin(k, c), ledRes[ch].b, 'led', [key, 'PCA', 'RES'], LEDC[c]);
+  });
+});
+// matriz: barramentos sob o painel + chicote até o Pro Micro
+const rowNets = ['LIN1', 'LIN2', 'LIN3', 'LIN4', 'LIN5', 'LIN6'], colNets = ['COL1', 'COL2', 'COL3', 'COL4', 'COL5'];
+const ROWC = 0x3fd3a6, COLC = 0xf2a541;
+ROW_Z.forEach((z, r) => {
+  const btns = CX.map((_, c) => 'BTN' + (r * 5 + c + 6));
+  wire(rowEnd(r), { obj: panel, p: new THREE.Vector3(CX[4] + 0.8, rowY, z + 0.9) }, 'mat', btns.concat(['MATRIX']), ROWC, { flat: true, lift: 0, r: 0.04 });
+  wire(rowEnd(r), pmPin(rowNets[r]), 'mat', btns.concat(['PM', 'MATRIX']), ROWC);
+});
+CX.forEach((x, c) => {
+  const btns = ROW_Z.map((_, r) => 'BTN' + (r * 5 + c + 6));
+  wire(colEnd(c), { obj: panel, p: new THREE.Vector3(x - 0.9, colY, PAD_Z[4] + 0.9) }, 'mat', btns.concat(['MATRIX']), COLC, { flat: true, lift: 0, r: 0.04 });
+  wire(colEnd(c), pmPin(colNets[c]), 'mat', btns.concat(['PM', 'MATRIX']), COLC);
+});
+
+// ------------------------------------------------------------ informações
+const INFO = {
+  PM: ['Placa', 'Arduino Pro Micro', 'ATmega32U4 com USB nativo. Lê a matriz e os faders e conversa com os outros chips pelo I²C.',
+       ['2 SDA e 3 SCL → MCP, PCA9685 e OLED', 'A0–A3 → cursores dos faders', '1, 4, 5, 6, 7, 8 → linhas da matriz', '9, 10, 14, 15, 16 → colunas da matriz', '0 → botão do encoder 5', 'VCC e GND → trilhas de 5V e GND']],
+  MCP: ['Chip', 'MCP23017 · 0x20', 'Expansor de entradas. Recebe o giro dos 5 encoders e os botões de 4 deles.',
+        ['21–25 → fase A dos encoders 1–5', '1–5 → fase B dos encoders 1–5', '26, 27, 6, 7 → botões SW1–SW4', '9 e 18 → 5V · 10, 15, 16, 17 → GND', '12 SCL e 13 SDA → Pro Micro 3 e 2']],
+  PCA: ['Módulo', 'PCA9685 · 0x40', 'Controlador PWM de 16 canais. Acende o LED RGB de cada encoder com qualquer cor.',
+        ['Canais 0–14 → R, G, B dos 5 encoders (com resistor)', 'GND, VCC, SCL, SDA → Pro Micro', 'OE e V+ ficam soltos']],
+  OLED: ['Display', 'OLED 0,96" · 0x3C', 'A tampa não tem janela para o display. A posição tracejada é uma sugestão: 26 × 15 mm centrada em X 61,35, Y 157 do arquivo.', ['GND e VCC → trilhas', 'SCL → pino 3 · SDA → pino 2']],
+  LID: ['Tampa.step', 'Tampa de aço 2 mm', '221,7 × 154,7 × 13 mm, cantos R15. Cavidade de 11 mm: os componentes passam da saia e pedem uma caixa de baixo.', ['4 rasgos 4 × 72 mm → faders', '4 furos Ø6,7 → sem uso no circuito', '25 quadrados 14 × 14 → chaves MX', '5 furos Ø7,0 → encoders', 'Sem janela para o OLED e sem furos para os 5 botões de baixo']],
+  RES: ['Resistores', 'Resistores dos LEDs', '15 resistores, um por cor: 330 Ω no vermelho, 220 Ω no verde e no azul.', ['Lado do módulo → canal PWM', 'Outro lado → pino R, G ou B do encoder']],
+  PD: ['Resistores', 'Pull-downs dos botões', '5 resistores de 10 kΩ, um por botão de encoder, até o GND.', ['Um lado → linha SW (MCP 26, 27, 6, 7 e Pro Micro 0)', 'Outro lado → GND']],
+  CAP: ['Capacitor', '100 nF do MCP23017', 'Filtra a alimentação do chip. Fica entre os pinos 9 e 10.', ['Pino 9 (VDD)', 'Pino 10 (VSS)']],
+  RAIL: ['Placa', 'Trilhas de 5V e GND', 'Duas trilhas que distribuem a alimentação da USB para tudo.', ['5V: Pro Micro, MCP, PCA9685, OLED, faders, comum dos LEDs', 'GND: os mesmos, mais o pino C dos encoders e os pull-downs']],
+  PERF: ['Placa', 'Placa perfurada', 'Base onde ficam o Pro Micro, o MCP23017, o PCA9685 e os resistores.', []],
+  MATRIX: ['Matriz', 'Matriz 6×5', 'Linhas e colunas sob o painel, um diodo por botão.', []]
+};
+for (let k = 0; k < 4; k++) INFO['FAD' + (k + 1)] = ['Fader', 'Fader ' + (k + 1) + ' · CC ' + (30 + k), 'Deslizante de 10 kΩ, curso 60 mm, no rasgo 4 × 72 mm em X ' + TAMPA.faderX[k].toFixed(2).replace('.', ',') + '.',
+  ['Ponta de cima → 5V', 'Cursor → A' + k + ' (pino ' + (18 + k) + ')', 'Ponta de baixo → GND']];
+const SWT = ['MCP 26', 'MCP 27', 'MCP 6', 'MCP 7', 'Pro Micro 0'];
+for (let k = 0; k < 5; k++) INFO['ENC' + (k + 1)] = ['Encoder', 'Encoder ' + (k + 1) + ' · CC ' + (21 + k), 'EC12 RGB no furo Ø7,0 em X ' + TAMPA.colX[k].toFixed(1).replace('.', ',') + ', Y 155,85. Girar muda o volume e a cor; apertar envia a nota ' + (k + 1) + '.',
+  ['A → MCP ' + (21 + k) + ' · B → MCP ' + (1 + k) + ' · C → GND', 'R, G, B → PCA9685 canais ' + 3 * k + ', ' + (3 * k + 1) + ', ' + (3 * k + 2), '+ → 5V', 'SW → ' + SWT[k] + ' e 10 kΩ ao GND']];
+const LINP = [1, 4, 5, 6, 7, 8], COLP = [9, 10, 14, 15, 16];
+for (let r = 0; r < 6; r++) for (let c = 0; c < 5; c++) {
+  const n = r * 5 + c + 6;
+  INFO['BTN' + n] = ['Chave da matriz', (r < 5 ? 'Chave MX' : 'Botão') + ' n' + n, 'Quadrado 14 × 14 mm. Envia a nota ' + n + '. Diodo 1N4148 com a faixa do lado da linha.',
+    ['Coluna ' + (c + 1) + ' → pino ' + COLP[c], 'Linha ' + (r + 1) + ' → pino ' + LINP[r] + ' (pelo diodo)']];
+}
+
+// ------------------------------------------------------------ seleção e visibilidade
+const groupOn = {}; Object.keys(GROUPS).forEach(g => groupOn[g] = true);
+let selected = null;
+const selMats = new Map();
+function applyView() {
+  for (const w of wires) {
+    const ud = w.userData, on = groupOn[ud.group];
+    w.visible = on;
+    const hit = !selected || ud.comps.includes(selected);
+    w.material.opacity = hit ? 1 : 0.07;
+    w.material.emissive && w.material.emissive.setHex(selected && hit ? 0x333333 : 0x000000);
+  }
+  selMats.forEach((orig, mesh) => { mesh.material = orig; }); selMats.clear();
+  if (selected) for (const m of pickables) if (m.userData.key === selected && m.material !== M.screen && !m.userData.noHi) {
+    selMats.set(m, m.material);
+    const c = m.material.clone(); c.emissive = new THREE.Color(0x4a3a10); c.emissiveIntensity = 1; m.material = c;
+  }
+}
+function select(key) {
+  selected = key;
+  const card = $('card');
+  if (!key || !INFO[key]) { selected = null; card.hidden = true; applyView(); return; }
+  const [k, t, p, l] = INFO[key];
+  $('c-k').textContent = k; $('c-t').textContent = t; $('c-p').textContent = p;
+  $('c-l').replaceChildren(...l.map(s => { const li = document.createElement('li'); li.textContent = s; return li; }));
+  card.hidden = false; applyView();
+}
+$('c-x').addEventListener('click', () => select(null));
+
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) { down = null; return; }
+  down = null;
+  const r = renderer.domElement.getBoundingClientRect();
+  ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(pickables, false);
+  const h = hits.find(x => x.object.userData.key !== 'PERF') || hits[0];
+  select(h ? h.object.userData.key : null);
+});
+
+// painel de controle: fios
+const wl = $('wires');
+Object.entries(GROUPS).forEach(([g, d]) => {
+  const id = 'w-' + g, lab = document.createElement('label');
+  lab.className = 'chk'; lab.htmlFor = id;
+  lab.innerHTML = '<input type="checkbox" id="' + id + '" checked><span class="sw" style="background:#' + d.color.toString(16).padStart(6, '0') + '"></span>' + d.name;
+  wl.appendChild(lab);
+  lab.querySelector('input').addEventListener('change', ev => { groupOn[g] = ev.target.checked; applyView(); });
+});
+
+// separação
+function setExplode(v) {
+  panel.position.y = 3.2 + v / 100 * 9;
+  $('ex-o').textContent = Math.round(v) + '%';
+  rebuildWires();
+}
+$('explode').addEventListener('input', e => setExplode(+e.target.value));
+$('glass').addEventListener('change', e => { M.panel.opacity = e.target.checked ? 0.32 : 0.97; M.panel.depthWrite = !e.target.checked; M.panel.needsUpdate = true; });
+$('labels').addEventListener('change', e => labelSprites.forEach(s => s.visible = e.target.checked));
+
+// encoders: volume, giro e cor
+function drawOled() {
+  const c = oledCanvas.getContext('2d');
+  c.fillStyle = '#000'; c.fillRect(0, 0, 256, 128);
+  c.fillStyle = '#bfe9ff'; c.font = '600 15px "IBM Plex Mono", monospace'; c.textBaseline = 'top';
+  c.fillText('MIDI CONTROLLER', 8, 6);
+  const P = [64, 12, 127, 0], pad = n => String(n).padStart(3, ' ');
+  for (let r = 0; r < 5; r++) c.fillText('E' + (r + 1) + ':' + pad(encVal[r]) + (r < 4 ? '   P' + (r + 1) + ':' + pad(P[r]) : ''), 8, 30 + r * 19);
+  oledTex.needsUpdate = true;
+}
+function setEnc(k, v) {
+  encVal[k] = v;
+  const [r, g, b] = hueRGB(v), col = new THREE.Color(r, g, b);
+  encRing[k].material.color.copy(col); encRing[k].material.emissive.copy(col);
+  encLight[k].color.copy(col);
+  encKnob[k].rotation.y = -(v / 127) * Math.PI * 1.5 + Math.PI * 0.75;
+  const o = $('eo' + k), d = $('ed' + k);
+  if (o) o.textContent = v;
+  if (d) d.style.background = 'rgb(' + [r, g, b].map(x => Math.round(x * 255)).join(',') + ')';
+}
+const el = $('encs');
+encVal.forEach((v, k) => {
+  const lab = document.createElement('label'); lab.htmlFor = 'e' + k;
+  lab.innerHTML = 'E' + (k + 1) + '<input type="range" id="e' + k + '" min="0" max="127" value="' + v + '"><output id="eo' + k + '">' + v + '</output><span class="dot" id="ed' + k + '"></span>';
+  el.appendChild(lab);
+  lab.querySelector('input').addEventListener('input', e => { setEnc(k, +e.target.value); drawOled(); });
+});
+encVal.forEach((v, k) => setEnc(k, v)); drawOled();
+
+// vistas
+function view(name) {
+  const t = new THREE.Vector3(0, 3.5, 0.5);
+  const p = name === 'top' ? new THREE.Vector3(0, 34, 0.52) : name === 'side' ? new THREE.Vector3(0, 8, 30) : new THREE.Vector3(13, 17, 19);
+  camera.position.copy(p); controls.target.copy(t); controls.update();
+}
+$('v-iso').addEventListener('click', () => view('iso'));
+$('v-top').addEventListener('click', () => view('top'));
+$('v-side').addEventListener('click', () => view('side'));
+
+// tamanho
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  if (w < 560) { camera.fov = 50; camera.updateProjectionMatrix(); }
+}
+new ResizeObserver(resize).observe(stage);
+resize(); setExplode(60); view('iso'); applyView();
+$('status').hidden = true;
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawOled);
+
+(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+})();
+</script>
+
+</body>
+</html>
